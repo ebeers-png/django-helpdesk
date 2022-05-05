@@ -12,7 +12,7 @@ scripts/get_email.py - Designed to be run from cron, this script checks the
 """
 from django.core.management.base import BaseCommand
 
-from helpdesk.email import process_email
+from helpdesk import email_boston, email
 
 
 class Command(BaseCommand):
@@ -31,11 +31,25 @@ class Command(BaseCommand):
             default=False,
             help='Hide details about each queue/message as they are processed',
         )
+        parser.add_argument(
+            '--city',
+            action='store',
+            dest='city',
+            type=ascii,
+            default='',
+            help='To use a per-city method.',
+        )
 
     def handle(self, *args, **options):
         quiet = options.get('quiet', False)
-        process_email(quiet=quiet)
+        city = options.get('city', '')
+        if city == 'boston':
+            email_boston.process_email(quiet=quiet)
+        elif city == 'dc':
+            email.process_email(quiet=quiet, dc=True)
+        else:
+            email.process_email(quiet=quiet)
 
 
 if __name__ == '__main__':
-    process_email()
+    email.process_email()

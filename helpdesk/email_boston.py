@@ -20,6 +20,7 @@ from email.utils import getaddresses, parseaddr
 from os.path import isfile, join
 from time import ctime
 from functools import reduce
+from dateutil import parser
 
 from bs4 import BeautifulSoup
 from django.conf import settings as django_settings
@@ -58,6 +59,13 @@ DC_SUBJECTS = [
     "Benchmarking Report Accepted",
 ]
 DC_QUEUE_NAME = "Benchmarking Data Quality"
+PATTERN_UID = re.compile(r'\d+ \(UID (?P<uid>\d+)\)')
+PROCESSED_FOLDER_NAME = 'Processed'
+
+
+def parse_uid(data):
+    match = PATTERN_UID.match(data)
+    return match.group('uid')
 
 
 def process_email(quiet=False, dc=False):
@@ -189,6 +197,7 @@ def imap_sync(q, logger, server):
         server.logout()
         sys.exit()
 
+    email_list = []
     try:
         if q.keep_mail:
             status, data = server.search(None, 'NOT', 'ANSWERED')
@@ -197,7 +206,6 @@ def imap_sync(q, logger, server):
         if data:
             msg_nums = data[0].split()
             logger.info("Received %s messages from IMAP server" % len(msg_nums))
-
             for num_raw in msg_nums:
                 if type(num_raw) is bytes:
                     try:
@@ -208,34 +216,79 @@ def imap_sync(q, logger, server):
                 else:
                     # already a str
                     num = num_raw
+                # Get UID and use that
+                resp, uid = server.fetch(num, "(UID)")
+                uid = uid[0].decode('ascii')
+                msg_uid = parse_uid(uid)
+                logger.info("Received message UID: %s" % msg_uid)
 
-                logger.info("Processing message %s" % num)
-                status, data = server.fetch(num, '(RFC822)')
+                # Grab message first to get date to sort by
+                status, data = server.uid('fetch', msg_uid, '(RFC822)')
                 full_message = encoding.force_text(data[0][1], errors='replace')
-                try:
-                    ticket = object_from_message(message=full_message, queue=q, logger=logger)
-                except TypeError:
-                    ticket = None  # hotfix. Need to work out WHY.
-                except BadHeaderError:
-                    # Malformed email received from the server
-                    ticket = None
-                if ticket:
-                    if DEBUGGING:
-                        logger.info("Successfully processed message %s, left untouched on IMAP server\n" % num)
-                    elif q.keep_mail:
-                        server.store(num, '+FLAGS', '\\Answered')
-                        logger.info("Successfully processed message %s, marked as Answered on IMAP server\n" % num)
-                    else:
-                        server.store(num, '+FLAGS', '\\Deleted')
-                        logger.info("Successfully processed message %s, deleted from IMAP server\n" % num)
-                else:
-                    logger.warn("Message %s was not successfully processed, and will be left on IMAP server\n" % num)
+                full_message = email.message_from_string(full_message)
+
+                # Locate date and parse into datetime object
+                date = full_message.get('date', None)
+                if date:
+                    date = parser.parse(date)
+                if not date:
+                    received = full_message.get('received', None)
+                    if received:
+                        received = received.split(";")
+                        date = None
+                        for r in received:
+                            try:
+                                p = parser.parse(r, fuzzy=True)
+                            except ValueError:
+                                pass
+                            else:
+                                date = p
+                        if not date:
+                            date = timezone.now()
+
+                email_list.append({
+                    'uid': msg_uid,
+                    'date': date,
+                    'msg': full_message,
+                })
     except imaplib.IMAP4.error:
         logger.error(
             "IMAP retrieve failed. Is the folder '%s' spelled correctly, and does it exist on the server?",
             q.email_box_imap_folder
         )
 
+    # Sort by date and begin processing
+    email_list.sort(key=lambda i: i['date'])
+    logger.info('')
+    for e in email_list:
+        logger.info("Processing message UID %s" % e['uid'])
+        logger.info("- Date: %s" % e['date'])
+        try:
+            ticket = object_from_message(message=e['msg'], queue=q, logger=logger)
+        except TypeError:
+            ticket = None  # hotfix. Need to work out WHY.
+        except BadHeaderError:
+            # Malformed email received from the server
+            ticket = None
+        if ticket:
+            # For Boston's importing: copy to a different label and delete the original
+            result = server.uid('COPY', e['uid'], 'Processed')
+            if result[0] == 'OK':
+                ov, data = server.uid('STORE', e['uid'], '+FLAGS', '(\\Deleted)')
+            """
+            if DEBUGGING:
+                logger.info("Successfully processed message %s, left untouched on IMAP server\n" % e[0])
+            elif q.keep_mail:
+                server.store(e[0], '+FLAGS', '\\Answered')
+                logger.info("Successfully processed message %s, marked as Answered on IMAP server\n" % e[0])
+            else:
+                server.store(e[0], '+FLAGS', '\\Deleted')
+                logger.info("Successfully processed message %s, deleted from IMAP server\n" % e[0])
+            """
+        else:
+            logger.warn("Message %s was not successfully processed, and will be left on IMAP server\n" % e[0])
+
+        logger.info('')
     server.expunge()
     server.close()
     server.logout()
@@ -404,6 +457,9 @@ def create_object_from_email_message(message, ticket_id, payload, files, logger)
     message_id = parseaddr(message.get('Message-Id'))[1]
     in_reply_to = parseaddr(message.get('In-Reply-To'))[1]
     references = parseaddr(message.get('References'))
+    logger.info('- msg id: %s' % message_id)
+    logger.info('- in reply to: %s' % in_reply_to)
+    logger.info('- references: %s' % references[1])
 
     if in_reply_to:
         try:
@@ -511,6 +567,14 @@ def create_object_from_email_message(message, ticket_id, payload, files, logger)
         notifications_to_be_sent.remove(None)
     notifications_to_be_sent = ','.join(notifications_to_be_sent)
 
+    """
+    Pre-2022 emails:
+    - Don't send any updates out to anyone. Only import them
+    - => Comment out this whole section!
+    Post-2022 emails:
+    - Maybe send updates? Not sure
+    """
+
     autoreply = is_autoreply(message)
     if autoreply:
         logger.info("Message seems to be auto-reply, not sending any emails back to the sender")
@@ -557,7 +621,6 @@ def create_object_from_email_message(message, ticket_id, payload, files, logger)
 
 def object_from_message(message, queue, logger):
     # 'message' must be an RFC822 formatted message.
-    message = email.message_from_string(message)
 
     # Replaces original helpdesk code "get_charset()", which wasn't an actual method ?
     charset = list(filter(lambda s: s is not None, message.get_charsets()))
@@ -575,6 +638,8 @@ def object_from_message(message, queue, logger):
         # Delete emails if the sender email cannot be parsed correctly. This ensures that
         # mailing list emails do not become tickets as well as malformatted emails
         return True
+
+    logger.info('- Subject: "%s"\n- Sender: %s <%s>' % (subject, sender[0], sender[1]))
 
     to_list = getaddresses(message.get_all('To', []))
     cc_list = getaddresses(message.get_all('Cc', []))
@@ -613,7 +678,7 @@ def object_from_message(message, queue, logger):
     # Accounting for forwarding loops
     auto_forward = message.get('X-BEAMHelpdesk-Delivered', None)
 
-    if auto_forward is not None or sender[1].lower() == queue.email_address.lower():
+    if auto_forward is not None:
         logger.info("Found a forwarding loop.")
         if ticket and Ticket.objects.filter(pk=ticket).exists():
             if sender[1].lower() == queue.email_address.lower() and auto_forward is None:

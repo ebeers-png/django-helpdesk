@@ -284,7 +284,8 @@ class Queue(models.Model):
         help_text=_('If using IMAP, what folder do you wish to fetch messages '
                     'from? This allows you to use one IMAP account for multiple '
                     'queues, by filtering messages on your IMAP server into separate '
-                    'folders. Default: INBOX.'),
+                    'folders. Default: INBOX. If the folder has spaces in the name, '
+                    'the name must be surrounded by quotation marks.'),
     )
 
     email_box_local_dir = models.CharField(
