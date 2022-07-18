@@ -39,6 +39,8 @@ def check_staff_status(check_staff=False):  # 1st bool -- unused
     """
     def check_superuser_status(check_superuser):  # 2nd bool
         def check_user_status(u, org=None):
+            if not u:
+                return False
             is_user = u.is_authenticated and u.is_active
             if not is_user:  # does not have an account in BEAM
                 return False
@@ -50,7 +52,7 @@ def check_staff_status(check_staff=False):  # 1st bool -- unused
 
             try:
                 org_user = OrganizationUser.objects.get(user=u, organization_id=helpdesk_org)
-            except OrganizationUser.MultipleObjectsReturned or OrganizationUser.DoesNotExist:
+            except (OrganizationUser.MultipleObjectsReturned, OrganizationUser.DoesNotExist) as e:
                 return False
 
             is_building_user = requires_building_user(org_user)

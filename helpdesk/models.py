@@ -152,37 +152,21 @@ class Queue(models.Model):
                     'try not to change it or e-mailing may get messy.'),
     )
 
-    email_address = models.EmailField(
-        _('E-Mail Address'),
-        blank=True,
-        null=True,
-        help_text=_('All outgoing e-mails for this queue will use this e-mail '
-                    'address. If you use IMAP or POP3, this should be the e-mail '
-                    'address for that mailbox.'),
-    )
-
-    locale = models.CharField(
-        _('Locale'),
-        max_length=10,
-        blank=True,
-        null=True,
-        help_text=_('Locale of this queue. All correspondence in this '
-                    'queue will be in this language.'),
-    )
+    importer_sender = models.ForeignKey('seed.ImporterSenderMapping', on_delete=models.SET_NULL, null=True, blank=True)
+    match_on = models.JSONField(blank=True, default=list,
+                                help_text="A list of strings. If you'd like only emails with "
+                                          "certain subject lines to be imported into this queue, "
+                                          "list that text here. Otherwise, leave blank.")
+    match_on_addresses = models.JSONField(blank=True, default=list,
+                                          help_text="A list of strings. If you'd like only emails from "
+                                                    "specific addresses to be imported into this queue, "
+                                                    "list those addresses here. Otherwise, leave blank.")
 
     allow_public_submission = models.BooleanField(
         _('Allow Public Submission?'),
         blank=True,
         default=False,
         help_text=_('Should this queue be listed on the public submission form?'),
-    )
-
-    allow_email_submission = models.BooleanField(
-        _('Allow E-Mail Submission?'),
-        blank=True,
-        default=False,
-        help_text=_('Do you want to poll the e-mail box below for new '
-                    'tickets?'),
     )
 
     escalate_days = models.IntegerField(
@@ -213,164 +197,14 @@ class Queue(models.Model):
                     'tickets, updates, reassignments, etc) for this queue. Separate '
                     'multiple addresses with a comma.'),
     )
-
+    # TODO implement -- when off, this should turn off ALL notifications in the future
     enable_notifications_on_email_events = models.BooleanField(
         _('Notify contacts when email updates arrive'),
         blank=True,
-        default=False,
+        default=True,
         help_text=_('When an email arrives to either create a ticket or to '
                     'interact with an existing discussion. Should email notifications be sent ? '
                     'Note: the new_ticket_cc and updated_ticket_cc work independently of this feature'),
-    )
-
-    email_box_type = models.CharField(
-        _('E-Mail Box Type'),
-        max_length=5,
-        choices=(('pop3', _('POP 3')), ('imap', _('IMAP')), ('local', _('Local Directory'))),
-        blank=True,
-        null=True,
-        help_text=_('E-Mail server type for creating tickets automatically '
-                    'from a mailbox - both POP3 and IMAP are supported, as well as '
-                    'reading from a local directory.'),
-    )
-
-    email_box_host = models.CharField(
-        _('E-Mail Hostname'),
-        max_length=200,
-        blank=True,
-        null=True,
-        help_text=_('Your e-mail server address - either the domain name or '
-                    'IP address. May be "localhost".'),
-    )
-
-    email_box_port = models.IntegerField(
-        _('E-Mail Port'),
-        blank=True,
-        null=True,
-        help_text=_('Port number to use for accessing e-mail. Default for '
-                    'POP3 is "110", and for IMAP is "143". This may differ on some '
-                    'servers. Leave it blank to use the defaults.'),
-    )
-
-    email_box_ssl = models.BooleanField(
-        _('Use SSL for E-Mail?'),
-        blank=True,
-        default=False,
-        help_text=_('Whether to use SSL for IMAP or POP3 - the default ports '
-                    'when using SSL are 993 for IMAP and 995 for POP3.'),
-    )
-
-    email_box_user = models.CharField(
-        _('E-Mail Username'),
-        max_length=200,
-        blank=True,
-        null=True,
-        help_text=_('Username for accessing this mailbox.'),
-    )
-
-    email_box_pass = models.CharField(
-        _('E-Mail Password'),
-        max_length=200,
-        blank=True,
-        null=True,
-        help_text=_('Password for the above username'),
-    )
-
-    email_box_imap_folder = models.CharField(
-        _('IMAP Folder'),
-        max_length=100,
-        blank=True,
-        null=True,
-        help_text=_('If using IMAP, what folder do you wish to fetch messages '
-                    'from? This allows you to use one IMAP account for multiple '
-                    'queues, by filtering messages on your IMAP server into separate '
-                    'folders. Default: INBOX. If the folder has spaces in the name, '
-                    'the name must be surrounded by quotation marks.'),
-    )
-
-    email_box_local_dir = models.CharField(
-        _('E-Mail Local Directory'),
-        max_length=200,
-        blank=True,
-        null=True,
-        help_text=_('If using a local directory, what directory path do you '
-                    'wish to poll for new email? '
-                    'Example: /var/lib/mail/helpdesk/'),
-    )
-
-    permission_name = models.CharField(
-        _('Django auth permission name'),
-        max_length=72,  # based on prepare_permission_name() pre-pending chars to slug
-        blank=True,
-        null=True,
-        editable=False,
-        help_text=_('Name used in the django.contrib.auth permission system'),
-    )
-
-    email_box_interval = models.IntegerField(
-        _('E-Mail Check Interval'),
-        help_text=_('How often do you wish to check this mailbox? (in Minutes)'),
-        blank=True,
-        null=True,
-        default='5',
-    )
-
-    email_box_last_check = models.DateTimeField(
-        blank=True,
-        null=True,
-        editable=False,
-        # This is updated by management/commands/get_mail.py.
-    )
-
-    socks_proxy_type = models.CharField(
-        _('Socks Proxy Type'),
-        max_length=8,
-        choices=(('socks4', _('SOCKS4')), ('socks5', _('SOCKS5'))),
-        blank=True,
-        null=True,
-        help_text=_('SOCKS4 or SOCKS5 allows you to proxy your connections through a SOCKS server.'),
-    )
-
-    socks_proxy_host = models.GenericIPAddressField(
-        _('Socks Proxy Host'),
-        blank=True,
-        null=True,
-        help_text=_('Socks proxy IP address. Default: 127.0.0.1'),
-    )
-
-    socks_proxy_port = models.IntegerField(
-        _('Socks Proxy Port'),
-        blank=True,
-        null=True,
-        help_text=_('Socks proxy port number. Default: 9150 (default TOR port)'),
-    )
-
-    logging_type = models.CharField(
-        _('Logging Type'),
-        max_length=5,
-        choices=(
-            ('none', _('None')),
-            ('debug', _('Debug')),
-            ('info', _('Information')),
-            ('warn', _('Warning')),
-            ('error', _('Error')),
-            ('crit', _('Critical'))
-        ),
-        blank=True,
-        null=True,
-        help_text=_('Set the default logging level. All messages at that '
-                    'level or above will be logged to the directory set '
-                    'below. If no level is set, logging will be disabled.'),
-    )
-
-    logging_dir = models.CharField(
-        _('Logging Directory'),
-        max_length=200,
-        blank=True,
-        null=True,
-        help_text=_('If logging is enabled, what directory should we use to '
-                    'store log files for this queue? '
-                    'The standard logging mechanims are used if no directory is set'),
     )
 
     default_owner = models.ForeignKey(
@@ -382,13 +216,15 @@ class Queue(models.Model):
         verbose_name=_('Default owner'),
     )
 
+    reassign_when_closed = models.BooleanField(
+        default=False,
+        help_text=_('When a ticket is closed, reassign the ticket to the default owner (if one is set).')
+    )
+
     dedicated_time = models.DurationField(
         help_text=_("Time to be spent on this Queue in total"),
         blank=True, null=True
     )
-
-    keep_mail = models.BooleanField(default=False,
-                                    help_text=_('After processing, should mail be kept in the inbox? (IMAP only.)'))
 
     def __str__(self):
         return "%s" % self.title
@@ -398,24 +234,6 @@ class Queue(models.Model):
         verbose_name = _('Queue')
         verbose_name_plural = _('Queues')
         unique_together = ('organization', 'slug')
-
-    def _from_address(self):
-        """
-        Short property to provide a sender address in SMTP format,
-        eg 'Name <email>'. We do this so we can put a simple error message
-        in the sender name field, so hopefully the admin can see and fix it.
-        """
-        if not self.email_address:
-            # must check if given in format "Foo <foo@example.com>"
-            default_email = re.match(".*<(?P<email>.*@*.)>", settings.DEFAULT_FROM_EMAIL)
-            if default_email is not None:
-                # already in the right format, so just include it here
-                return u'NO QUEUE EMAIL ADDRESS DEFINED %s' % settings.DEFAULT_FROM_EMAIL
-            else:
-                return u'NO QUEUE EMAIL ADDRESS DEFINED <%s>' % settings.DEFAULT_FROM_EMAIL
-        else:
-            return u'%s <%s>' % (self.title, self.email_address)
-    from_address = property(_from_address)
 
     @property
     def time_spent(self):
@@ -432,6 +250,24 @@ class Queue(models.Model):
     def time_spent_formatted(self):
         return format_time_spent(self.time_spent)
 
+    @property
+    def email_address(self):
+        if self.importer_sender:
+            return self.importer_sender.email_address
+        elif self.organization.sender:
+            return self.organization.sender.from_address
+        else:
+            return None
+
+    @property
+    def from_address(self):
+        if self.importer_sender:
+            return self.importer_sender.sender.from_address
+        elif self.organization.sender:
+            return self.organization.sender.from_address
+        else:
+            return u'NO EMAIL ADDRESS DEFINED <%s>' % settings.DEFAULT_FROM_EMAIL
+
     def prepare_permission_name(self):
         """Prepare internally the codename for the permission and store it in permission_name.
         :return: The codename that can be used to create a new Permission object.
@@ -442,28 +278,6 @@ class Queue(models.Model):
         return basename
 
     def save(self, *args, **kwargs):
-        if self.email_box_type == 'imap' and not self.email_box_imap_folder:
-            self.email_box_imap_folder = 'INBOX'
-
-        if self.socks_proxy_type:
-            if not self.socks_proxy_host:
-                self.socks_proxy_host = '127.0.0.1'
-            if not self.socks_proxy_port:
-                self.socks_proxy_port = 9150
-        else:
-            self.socks_proxy_host = None
-            self.socks_proxy_port = None
-
-        if not self.email_box_port:
-            if self.email_box_type == 'imap' and self.email_box_ssl:
-                self.email_box_port = 993
-            elif self.email_box_type == 'imap' and not self.email_box_ssl:
-                self.email_box_port = 143
-            elif self.email_box_type == 'pop3' and self.email_box_ssl:
-                self.email_box_port = 995
-            elif self.email_box_type == 'pop3' and not self.email_box_ssl:
-                self.email_box_port = 110
-
         if not self.id:
             # Prepare the permission codename and the permission
             # (even if they are not needed with the current configuration)
@@ -558,13 +372,13 @@ class Ticket(models.Model):
     Note that assigned_to is optional - unassigned tickets are displayed on
     the dashboard to prompt users to take ownership of them.
     """
-
     OPEN_STATUS = 1
     REOPENED_STATUS = 2
     RESOLVED_STATUS = 3
     CLOSED_STATUS = 4
     DUPLICATE_STATUS = 5
     REPLIED_STATUS = 6
+    NEW_STATUS = 7
 
     STATUS_CHOICES = (
         (OPEN_STATUS, _('Open')),
@@ -573,6 +387,7 @@ class Ticket(models.Model):
         (CLOSED_STATUS, _('Closed')),
         (DUPLICATE_STATUS, _('Duplicate')),
         (REPLIED_STATUS, _('Replied')),
+        (NEW_STATUS, _('New')),
     )
 
     PRIORITY_CHOICES = (
@@ -591,7 +406,7 @@ class Ticket(models.Model):
                                    help_text=_('Date this ticket was first created'), )
     modified = models.DateTimeField(_('Modified'), auto_now=True,
                                     help_text=_('Date this ticket was most recently changed.'))
-    status = models.IntegerField(_('Status'), choices=STATUS_CHOICES, default=OPEN_STATUS)
+    status = models.IntegerField(_('Status'), choices=STATUS_CHOICES, default=NEW_STATUS)
     on_hold = models.BooleanField(_('On Hold'), blank=True, default=False,
                                   help_text=_('If a ticket is on hold, it will not automatically be escalated.'))
     resolution = models.TextField(_('Resolution'), blank=True, null=True,
@@ -650,7 +465,7 @@ class Ticket(models.Model):
     def time_spent_formatted(self):
         return format_time_spent(self.time_spent)
 
-    def send(self, roles, dont_send_to=None, **kwargs):
+    def send(self, roles, organization=None, dont_send_to=None,  **kwargs):
         """
         Send notifications to everyone interested in this ticket.
 
@@ -698,7 +513,7 @@ class Ticket(models.Model):
         def send(role, recipient):
             if recipient and recipient not in recipients and role in roles:
                 template, context = roles[role]
-                send_templated_mail(template, context, recipient, sender=self.queue.from_address, **kwargs)
+                send_templated_mail(template, context, recipient, sender=self.queue.from_address, organization=organization, **kwargs)
                 recipients.add(recipient)
 
         # Attempts to send an email to every possible field.
@@ -854,7 +669,7 @@ class Ticket(models.Model):
         True = any dependencies are resolved
         False = There are non-resolved dependencies
         """
-        OPEN_STATUSES = (Ticket.OPEN_STATUS, Ticket.REOPENED_STATUS)
+        OPEN_STATUSES = (Ticket.OPEN_STATUS, Ticket.REOPENED_STATUS, Ticket.REPLIED_STATUS, Ticket.NEW_STATUS)
         return TicketDependency.objects.filter(ticket=self).filter(
             depends_on__status__in=OPEN_STATUSES).count() == 0
     can_be_resolved = property(_can_be_resolved)
@@ -1381,6 +1196,12 @@ class EmailTemplate(models.Model):
     access to the filesystem.
     """
 
+    organization = models.ForeignKey(
+        Organization,
+        on_delete=models.CASCADE,
+        null=True,
+    )
+
     template_name = models.CharField(
         _('Template Name'),
         max_length=100,
@@ -1852,11 +1673,11 @@ class IgnoreEmail(models.Model):
         verbose_name = _('Ignored e-mail address')
         verbose_name_plural = _('Ignored e-mail addresses')
 
-    queues = models.ManyToManyField(
-        Queue,
+    importers = models.ManyToManyField(
+        'seed.EmailImporter',
         blank=True,
-        help_text=_('Leave blank for this e-mail to be ignored on all queues, '
-                    'or select those queues you wish to ignore this e-mail for.'),
+        help_text=_('Leave blank for this e-mail to be ignored on all importer emails, '
+                    'or select those importers you wish to ignore this e-mail for.'),
     )
 
     name = models.CharField(
@@ -1894,15 +1715,15 @@ class IgnoreEmail(models.Model):
             self.date = timezone.now()
         return super(IgnoreEmail, self).save(*args, **kwargs)
 
-    def queue_list(self):
-        """Return a list of the queues this IgnoreEmail applies to.
-        If this IgnoreEmail applies to ALL queues, return '*'.
+    def importer_list(self):
+        """Return a list of the importers this IgnoreEmail applies to.
+        If this IgnoreEmail applies to ALL importers, return '*'.
         """
-        queues = self.queues.all().order_by('title')
-        if len(queues) == 0:
+        importers = self.importers.all().order_by('username')
+        if len(importers) == 0:
             return '*'
         else:
-            return ', '.join([str(q) for q in queues])
+            return ', '.join([str(i) for i in importers])
 
     def test(self, email):
         """

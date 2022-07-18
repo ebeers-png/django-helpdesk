@@ -176,7 +176,23 @@ urlpatterns = [
 
     url(r'set_default_org/(?P<user_id>[0-9]+)/(?P<org_id>[0-9]+)/$',
         staff.set_default_org,
-        name="set_default_org")
+        name="set_default_org"),
+
+    url(r'set_user_timezone/$',
+        staff.set_user_timezone,
+        name="set_user_timezone"),
+
+    url(r'pair_property_milestone/(?P<ticket_id>[0-9]+)/$',
+        staff.pair_property_milestone,
+        name="pair_property_milestone"),
+
+    url(r'edit_inventory_labels/(?P<inventory_type>(property|taxlot))/(?P<ticket_id>[0-9]+)/$',
+        staff.edit_inventory_labels,
+        name="edit_inventory_labels"),
+
+    url(r'export_report/$',
+        staff.export_report,
+        name="export_report"),
 ]
 
 urlpatterns += [

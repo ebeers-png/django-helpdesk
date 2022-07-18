@@ -17,6 +17,7 @@ from django.http import HttpResponseRedirect
 from django.shortcuts import render, get_object_or_404
 from django.utils.http import urlquote
 from django.utils.translation import ugettext as _
+from django.utils.timezone import now
 from django.conf import settings
 from django.views.decorators.clickjacking import xframe_options_exempt
 from django.views.decorators.csrf import csrf_exempt
@@ -31,6 +32,8 @@ import helpdesk.views.abstract_views as abstract_views
 from helpdesk.lib import text_is_spam
 from helpdesk.models import Ticket, Queue, UserSettings, CustomField, FormType, TicketCC
 from helpdesk.user import huser_from_request
+
+from seed.models import PropertyMilestone, Note
 
 logger = logging.getLogger(__name__)
 
@@ -108,6 +111,25 @@ class BaseCreateTicketView(abstract_views.AbstractCreateTicketMixin, FormView):
             return render(request, template_name='helpdesk/public_spam.html')
         else:
             ticket = form.save(form_id=self.form_id, user=self.request.user if self.request.user.is_authenticated else None)
+            if request.GET.get('milestone_beam_redirect', False):
+                # Pair Ticket to Milestone
+                pm = PropertyMilestone.objects.filter(id=request.GET.get('property_milestone_id', None)).first()
+                if pm:
+                    pm.ticket = ticket
+                    pm.submission_date = now()
+                    pm.implementation_status = PropertyMilestone.MILESTONE_IN_REVIEW
+                    pm.save()
+
+                note_kwargs = {'organization_id': request.GET.get('org_id'), 'user': request.user,
+                               'name': 'Automatically Created', 'property_view': pm.property_view,
+                               'note_type': Note.LOG,
+                               'log_data': [{'model': 'PropertyMilestone', 'name': pm.milestone.name,
+                                             'action': 'edited with the following:'},
+                                            {'field': 'Milestone Submitted Ticket',
+                                             'previous_value': 'None', 'new_value': f'Ticket ID {pm.ticket.id}',
+                                             'state_id': pm.property_view.state.id}]
+                               }
+                Note.objects.create(**note_kwargs)
             try:
                 return HttpResponseRedirect(ticket.ticket_url)
             except ValueError:

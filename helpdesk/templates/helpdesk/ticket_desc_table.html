@@ -22,12 +22,24 @@ copy_public_link = function() {
             <table class="table table-sm table-border">
                 <thead class="thead-light">
                     <tr class=''><th colspan='4'><h3>{{ ticket.queue.slug }}-{{ ticket.id }}. {{ ticket.title }} [{{ ticket.get_status }}]</h3>
-                            {% blocktrans with ticket.queue as queue %}Queue: {{ queue }}{% endblocktrans %}
-                            <span class='ticket_toolbar float-right'>
-                        <a href="{% url 'helpdesk:edit' ticket.id %}" class="ticket-edit"><button class="btn btn-warning btn-sm"><i class="fas fa-pencil-alt"></i> {% trans "Edit" %}</button></a>
-                    | <a href="{% url 'helpdesk:delete' ticket.id %}" class="ticket-delete"><button class="btn btn-danger btn-sm"><i class="fas fa-trash-alt"></i> {% trans "Delete" %}</button></a>
-                    {% if ticket.on_hold %} | <a href="{% url 'helpdesk:unhold' ticket.id %}" class="ticket-hold"><button class="btn btn-warning btn-sm"><i class="fas fa-play"></i> {% trans "Unhold" %}</button></a>{% else %} | <a href="{% url 'helpdesk:hold' ticket.id %}" class="ticket-hold"><button class="btn btn-warning btn-sm"><i class="fas fa-pause"></i> {% trans "Hold" %}</button></a>{% endif %}
-                    </span></th></tr>
+                        {% blocktrans with ticket.queue as queue %}Queue: {{ queue }}{% endblocktrans %}
+                        <span class='ticket_toolbar float-right'>
+                            {% if ticket.property_milestone %}
+                            <a href="{{ ticket.property_milestone.property_view_url }}" target="_blank" rel="noopener noreferrer"><button class="btn btn-primary btn-sm"><i class="fas fa-road"></i> {% trans "View Milestone" %}</button></a> |
+                            {% else %}
+                            <a href="{% url 'helpdesk:pair_property_milestone' ticket.id %}"><button class="btn btn-primary btn-sm" {% if not ticket.beam_property.count %}disabled data-toggle="tooltip" data-placement="top" title="Must be paired to a BEAM Property to Pair a Milestone" {% endif %}><i class="fas fa-road"></i> {% trans "Pair to Milestone" %}</button></a> |
+                            {% endif %}
+                            <a href="{% url 'helpdesk:edit_inventory_labels' 'property' ticket.id %}"><button class="btn btn-primary btn-sm" {% if not ticket.beam_property.count %}disabled data-toggle="tooltip" data-placement="top" title="Must be paired to a BEAM Property to Edit Labels" {% endif %}><i class="fas fa-building"></i> {% trans "Edit Property Labels" %}</button></a> |
+                            <a href="{% url 'helpdesk:edit_inventory_labels' 'taxlot' ticket.id %}"><button class="btn btn-primary btn-sm" {% if not ticket.beam_taxlot.count %}disabled data-toggle="tooltip" data-placement="top" title="Must be paired to a BEAM TaxLot to Edit Labels" {% endif %}><i class="fas fa-map"></i> {% trans "Edit TaxLot Labels" %}</button></a> |
+                            <a href="{% url 'helpdesk:edit' ticket.id %}" class="ticket-edit"><button class="btn btn-warning btn-sm"><i class="fas fa-pencil-alt"></i> {% trans "Edit" %}</button></a>
+                            | <a href="{% url 'helpdesk:delete' ticket.id %}" class="ticket-delete"><button class="btn btn-danger btn-sm"><i class="fas fa-trash-alt"></i> {% trans "Delete" %}</button></a>
+                            {% if ticket.on_hold %}
+                            | <a href="{% url 'helpdesk:unhold' ticket.id %}" class="ticket-hold"><button class="btn btn-warning btn-sm"><i class="fas fa-play"></i> {% trans "Unhold" %}</button></a>
+                            {% else %}
+                            | <a href="{% url 'helpdesk:hold' ticket.id %}" class="ticket-hold"><button class="btn btn-warning btn-sm"><i class="fas fa-pause"></i> {% trans "Hold" %}</button></a>
+                            {% endif %}
+                        </span>
+                    </th></tr>
 					<tr class=''><th colspan='4'>
                         <a href="#" onclick="copy_public_link()">Click to copy Public Link to your Clipboard</a>
 					</th></tr>
@@ -137,7 +149,6 @@ copy_public_link = function() {
                     </tr>{% endif %}
                 </tbody>
             </table>
-            <a href='#FurtherEditOptions'><button type="button" class="btn btn-sm btn-warning float-right" onclick="$('#FurtherEditOptions').fadeIn()"><i class="fas fa-pencil-alt"></i>&nbsp;{% trans "Edit details" %}</button></a>
         </div>
         <!-- /.table-responsive -->
     </div>

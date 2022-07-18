@@ -51,7 +51,7 @@ def ticket_template_context(ticket):
 def queue_template_context(queue):
     context = {}
 
-    for field in ('title', 'slug', 'email_address', 'from_address', 'locale'):
+    for field in ('title', 'slug', 'email_address', 'from_address', 'locale', 'organization_id', 'importer_sender_id'):
         attr = getattr(queue, field, None)
         if callable(attr):
             context[field] = attr()
@@ -67,7 +67,7 @@ def safe_template_context(ticket):
     comments and other details with ticket or queue parameters. Note that
     we don't just provide the Ticket & Queue objects to the template as
     they could reveal confidential information. Just imagine these two options:
-        * {{ ticket.queue.email_box_password }}
+        * {{ ticket.queue.password }}
         * {{ ticket.assigned_to.password }}
 
     Ouch!

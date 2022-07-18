@@ -3,7 +3,7 @@
 <div class="card mb-3">
     <div class="card-header">
         <i class="fas fa-table"></i>
-        {% trans "Unassigned Tickets" %} {% trans "(pick up a ticket if you start to work on it)" %}
+        {% if ticket_list_caption %}{{ ticket_list_caption }}{% endif %}
     </div>
     <div class="card-body">
         <div class="table-responsive">
@@ -22,7 +22,7 @@
                 <tbody>
                 {% for ticket in unassigned_tickets %}
                     <tr class="{{ ticket.get_priority_css_class }}">
-                        <td class="tickettitle"><a href='{{ ticket.get_absolute_url }}'>{{ ticket.id }}. {{ ticket.title }} </a></td>
+                        <td class="tickettitle" data-toggle="tooltip" title="{{ ticket.id }}. {{ ticket.title }}"><a href='{{ ticket.get_absolute_url }}'>{{ ticket.id }}. {{ ticket.title }} </a></td>
                         <td class="text-{{ ticket.get_priority_css_class }}">{{ ticket.get_priority }}</td>
                         <td>{{ ticket.queue }}</td>
                         <td><span title='{{ ticket.modified|naturaltime }}'>{{ ticket.modified|date:"DATETIME_FORMAT" }}</span></td>
@@ -34,13 +34,43 @@
                         </td>
                     </tr>
                 {% empty %}
-                    <tr><td colspan='6'>{% trans "There are no unassigned tickets." %}</td></tr>
+                    <tr><td colspan='7'>{% trans "There are no unassigned tickets." %}</td></tr>
                 {% endfor %}
                 </tbody>
             </table>
         </div>
+        {% if unassigned_tickets.has_other_pages %}
+            <ul class="pagination">
+            <!-- if we aren't on page one, go back to start and go back one controls -->
+            {% if unassigned_tickets.has_previous %}
+                <li><a href="?{{ page_var }}=1">&laquo;&laquo;</a>&nbsp;</li>
+                <li><a href="?{{ page_var }}={{ unassigned_tickets.previous_page_number }}">&laquo;</a>&nbsp;</li>
+            {% else %}
+                <li class="disabled"><span>&laquo;&laquo;&nbsp;</span></li>
+                <li class="disabled"><span>&laquo;&nbsp;</span></li>
+            {% endif %}
+            <!-- other pages, set thresh to the number to show before and after active -->
+            {% with 5 as thresh %}
+            {% for i in unassigned_tickets.paginator.page_range %}
+            {% if unassigned_tickets.number == i %}
+                <li class="active"><span>{{ i }}&nbsp;<span class="sr-only">(current)</span></span></li>
+            {% elif i <= unassigned_tickets.number|add:5 and i >= unassigned_tickets.number|add:-5 %}
+                <li><a href="?{{ page_var }}={{ i }}">{{ i }}</a>&nbsp;</li>
+            {% endif %}
+            {% endfor %}
+            {% endwith %}
+            <!-- if we aren't on the last page, go forward one and go to end controls -->
+            {% if unassigned_tickets.has_next %}
+                <li><a href="?{{ page_var }}={{ unassigned_tickets.next_page_number }}">&raquo;</a>&nbsp;</li>
+                <li><a href="?{{ page_var }}={{ unassigned_tickets.paginator.num_pages }}">&raquo;&raquo;</a>&nbsp;</li>
+            {% else %}
+                <li class="disabled"><span>&raquo;&nbsp;</span></li>
+                <li class="disabled"><span>&raquo;&raquo;&nbsp;</span></li>
+            {% endif %}
+            </ul>
+        {% endif %}
     </div>
-    <div class="card-footer small text-muted">Listing {{ unassigned_tickets|length }} ticket(s).</div>
+    <div class="card-footer small text-muted">Listing {{ unassigned_tickets|length }} ticket(s) out of {{ unassigned_tickets.paginator.count }}.</div>
 </div>
 
 {% for kbitem in kbitems %}
@@ -74,7 +104,7 @@
                         </td>
                     </tr>
                 {% empty %}
-                    <tr><td colspan='6'>{% trans "There are no unassigned tickets." %}</td></tr>
+                    <tr><td colspan='7'>{% trans "There are no unassigned tickets." %}</td></tr>
                 {% endfor %}
                 </tbody>
             </table>
