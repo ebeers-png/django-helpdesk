@@ -70,12 +70,12 @@
                                 <th>{% trans "Priority" %}</th>
                                 <th>{% trans "Queue" %}</th>
                                 <th>{% trans "Status" %}</th>
+                                <th>{% trans "Owner" %}</th>
+                                <th>{% trans "Submitter" %}</th>
                                 <th>{% trans "Paired Count" %}</th>
                                 <th>{% trans "Created" %}</th>
                                 <th>{% trans "Last Reply" %}</th>
                                 <th>{% trans "Due Date" %}</th>
-                                <th>{% trans "Owner" %}</th>
-                                <th>{% trans "Submitter" %}</th>
                                 <th>{% trans "Time Spent" %}</th>
                                 <th>{% trans "KB item" %}</th>
                                 {% if query_params.filtering.queue__id__in|length == 1 %}
@@ -343,6 +343,7 @@
 
         var selected = [];
         var all_ticket_ids = [];
+        var globalTimeout = null;
 
         $(document).ready(function () {
             if ( selector ) {
@@ -447,10 +448,6 @@
                         visible: false,
                     },
                     {name: "status", data: "status"},
-                    {name: "paired_count", data: "paired_count"},
-                    {name: "created", data: "created"},
-                    {name: "last_reply", data: "last_reply"},
-                    {name: "due_date", data: "due_date", "visible": false},
                     {
                         name: "assigned_to",
                         data: "assigned_to",
@@ -462,8 +459,12 @@
                         }
                     },
                     {name: "submitter", data: "submitter"},
-                    {name: "time_spent", data: "time_spent", "visible": false},
-                    {name: "kbitem", data: "kbitem"},
+                    {name: "paired_count", data: "paired_count", visible: false},
+                    {name: "created", data: "created"},
+                    {name: "last_reply", data: "last_reply"},
+                    {name: "due_date", data: "due_date", visible: false},
+                    {name: "time_spent", data: "time_spent", visible: false},
+                    {name: "kbitem", data: "kbitem", visible: false},
                     {% if query_params.filtering.queue__id__in|length == 1 %}
                     {% for col_name, display_name in extra_data_columns.items %}
                     {name: "{{ col_name }}", data: "{{ col_name }}"},
@@ -487,13 +488,19 @@
             }
 
             // Filter event handler
-            $( table.table().container() ).off('keyup change').on( 'keyup', 'thead input', function () {
-                var column = table.column( $(this).data('index') )
+
+            function filterFunction(thisSearch) {
+                globalTimeout = null;
+                var column = table.column( $(thisSearch).data('index') )
                 table
-                    .column( $(this).data('index') )
-                    .search( this.value )
+                    .column( $(thisSearch).data('index') )
+                    .search( thisSearch.value )
                     .draw();
-            } );
+            }
+            $( table.table().container() ).off('keyup change').on('keyup', 'thead input', function () {
+                if (globalTimeout != null) clearTimeout(globalTimeout);
+                globalTimeout = setTimeout(filterFunction, 400, this);
+            });
 
             // Get visible columns for csv filtering and saving
             table.on( 'buttons-action', function (e) {
@@ -513,7 +520,7 @@
                     $(this).val(visible_columns.toString());
                 });
             }
-            get_visible_cols() // On initialization
+            get_visible_cols(); // On initialization
 
             {# Timeline initialization when tab is displayed #}
             // The TL.Timeline constructor takes at least two arguments:
