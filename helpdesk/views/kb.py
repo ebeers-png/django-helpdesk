@@ -87,29 +87,16 @@ def edit_category(request, slug):
         form = EditKBCategoryForm(request.POST, slug)
 
         if form.is_valid():
-            name = form.cleaned_data['name']
-            title = form.cleaned_data['title']
-            #slug = form.cleaned_data['slug']
-            preview_description = form.cleaned_data['preview_description']
-            description = form.cleaned_data['description']
-            queue = form.cleaned_data['queue']
-            forms = form.cleaned_data['forms']
-            public = form.cleaned_data['public']
+            category.name = form.cleaned_data['name']
+            category.title = form.cleaned_data['title']
+            # slug = form.cleaned_data['slug']
+            category.preview_description = form.cleaned_data['preview_description']
+            category.description = form.cleaned_data['description']
+            category.queue = form.cleaned_data['queue']
+            category.forms.set(form.cleaned_data['forms'])
+            category.public = form.cleaned_data['public']
 
-            new_category = KBCategory(
-                id = category.id,
-                organization = category.organization,
-                name = name, 
-                title = title, 
-                slug = category.slug, 
-                preview_description = preview_description,
-                description = description,
-                queue = queue,
-                public = public
-            )
-            category.delete()
-            new_category.save()
-            new_category.forms.set(forms)
+            category.save()
         return HttpResponseRedirect(reverse('helpdesk:kb_category', args=[category.slug]))
 
 def article(request, slug, pk, iframe=False):
