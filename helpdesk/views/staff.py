@@ -20,7 +20,7 @@ from django.core.exceptions import ValidationError, PermissionDenied
 from django.core.files.base import ContentFile
 from django.core.files.storage import default_storage
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
-from django.db.models import Q, Prefetch, F
+from django.db.models import Q, Prefetch, F, Case, When
 from django.http import HttpResponseRedirect, Http404, HttpResponse, JsonResponse, HttpRequest
 from django.shortcuts import render, get_object_or_404, redirect
 from django.utils.translation import ugettext as _
@@ -74,7 +74,7 @@ from datetime import timedelta
 
 from ..templated_email import send_templated_mail
 
-from seed.models import PropertyView, Property, TaxLotView, TaxLot
+from seed.models import PropertyView, Property, TaxLotView, TaxLot, Column
 from urllib.parse import urlparse, urlunparse
 from django.http import QueryDict
 User = get_user_model()
@@ -159,7 +159,7 @@ def dashboard(request):
 
     # Get only active tickets
     active_tickets = active_tickets.filter(
-        queue__in=user_queues)
+        queue__in=user_queues).exclude(status=Ticket.DUPLICATE_STATUS)
 
     # open & reopened tickets, assigned to current user
     tickets = active_tickets.filter(
@@ -169,7 +169,7 @@ def dashboard(request):
     # closed & resolved tickets, assigned to current user
     tickets_closed_resolved = Ticket.objects.select_related('queue').filter(
         assigned_to=request.user,
-        status__in=[Ticket.CLOSED_STATUS, Ticket.RESOLVED_STATUS],
+        status__in=[Ticket.CLOSED_STATUS, Ticket.RESOLVED_STATUS, Ticket.DUPLICATE_STATUS],
         queue__in=user_queues,
     )
 
@@ -188,7 +188,15 @@ def dashboard(request):
         all_tickets_reported_by_current_user = Ticket.objects.select_related('queue').filter(
             submitter_email=email_current_user,
             queue__in=user_queues
-        ).order_by('status', '-id')
+        ).exclude(status=Ticket.DUPLICATE_STATUS).order_by(
+            # Custom Ordering: New, Open / Reopened, Replied, Resolved, Closed
+            Case(When(status=Ticket.NEW_STATUS, then=0), default=1),
+            Case(When(status__in=[Ticket.OPEN_STATUS, Ticket.REOPENED_STATUS], then=1), default=2),
+            Case(When(status=Ticket.REPLIED_STATUS, then=2), default=3),
+            Case(When(status=Ticket.RESOLVED_STATUS, then=3), default=4),
+            Case(When(status=Ticket.CLOSED_STATUS, then=3), default=4),
+            '-id'
+        )
 
     tickets_in_queues = Ticket.objects.filter(
         queue__in=user_queues,
@@ -429,7 +437,7 @@ def view_ticket(request, ticket_id):
 
         return update_ticket(request, ticket_id)
 
-    org = ticket.ticket_form.organization_id
+    org = ticket.ticket_form.organization
     users = list_of_helpdesk_staff(org)
     # TODO add back HELPDESK_STAFF_ONLY_TICKET_OWNERS setting
     """if helpdesk_settings.HELPDESK_STAFF_ONLY_TICKET_OWNERS:
@@ -459,7 +467,7 @@ def view_ticket(request, ticket_id):
 
     display_data = CustomField.objects.filter(ticket_form=ticket.ticket_form).only(
         'label', 'data_type',
-        'field_name', 'columns',
+        'field_name', 'column',
     )
     extra_data = []
     for values, object in zip(display_data.values(), display_data):  # TODO check how many queries this runs
@@ -468,15 +476,33 @@ def view_ticket(request, ticket_id):
                 values['value'] = ticket.extra_data[values['field_name']]
             else:
                 values['value'] = getattr(ticket, values['field_name'], None)
-            values['has_columns'] = True if object.columns.exists() else False
+            values['has_column'] = True if object.column else False
             extra_data.append(values)
+
+    prop_display_column = Column.objects.filter(organization=org, column_name=org.property_display_field, table_name='PropertyState').first()
+    if prop_display_column:
+        if prop_display_column.is_extra_data:
+            prop_display_query = f'state__extra_data__{prop_display_column.column_name}'
+        else:
+            prop_display_query = f'state__{prop_display_column.column_name}'
+    else:
+        prop_display_query = 'state__address_line_1'
+
+    taxlot_display_column = Column.objects.filter(organization=org, column_name=org.taxlot_display_field, table_name='TaxLotState').first()
+    if taxlot_display_column:
+        if taxlot_display_column.is_extra_data:
+            taxlot_display_query = f'state__extra_data__{taxlot_display_column.column_name}'
+        else:
+            taxlot_display_query = f'state__{taxlot_display_column.column_name}'
+    else:
+        taxlot_display_query = 'state__address_line_1'
 
     properties = list(
         PropertyView.objects.filter(property_id__in=ticket.beam_property.all().values_list('id', flat=True))
-        .order_by('property_id', '-cycle__end').distinct('property_id').values('id', 'property_id', address=F('state__address_line_1')))
+        .order_by('property_id', '-cycle__end').distinct('property_id').values('id', 'property_id', address=F(prop_display_query)))
     taxlots = list(
         TaxLotView.objects.filter(taxlot_id__in=ticket.beam_taxlot.all().values_list('id', flat=True))
-        .order_by('taxlot_id', '-cycle__end').distinct('taxlot_id').values('id', 'taxlot_id', address=F('state__address_line_1')))
+        .order_by('taxlot_id', '-cycle__end').distinct('taxlot_id').values('id', 'taxlot_id', address=F(taxlot_display_query)))
 
     for p in properties:
         if p['address'] is None or p['address'] == '':
@@ -957,6 +983,8 @@ def mass_update(request):
         )
     elif action == 'export':
         return export_ticket_table(request, tickets)
+    elif action == 'pair':
+        return batch_pair_properties_tickets(request, tickets)
 
     huser = HelpdeskUser(request.user)
     for t in Ticket.objects.filter(id__in=tickets):
@@ -2280,6 +2308,92 @@ def sort_string(begin, end):
 
 
 @staff_member_required
+def pair_property_ticket(request, ticket_id):
+    """
+    Pair BEAM properties and taxlots based on the information in the ticket.
+    TODO: Use celery to have building lookup & pairing happen in the background.
+    """
+    ticket = get_object_or_404(Ticket, id=ticket_id)
+    _pair_properties_by_form(request, ticket.ticket_form, [ticket])
+    return redirect(ticket)
+
+
+@staff_member_required
+def batch_pair_properties_tickets(request, ticket_ids):
+    tickets = Ticket.objects.filter(id__in=ticket_ids).order_by('ticket_form')
+
+    forms = {}
+    for t in tickets:
+        if t.ticket_form_id not in forms:
+            forms[t.ticket_form_id] = {'form': t.ticket_form, 'tickets': []}
+        forms[t.ticket_form_id]['tickets'].append(t)
+
+    for f in forms.values():
+        _pair_properties_by_form(request, f['form'], f['tickets'])
+
+    return HttpResponseRedirect(reverse('helpdesk:list'))
+
+
+@staff_member_required
+def _pair_properties_by_form(request, form, tickets):
+    from seed.models import PropertyState, TaxLotState, TaxLotView, PropertyView, Cycle
+
+    org = form.organization.id
+    fields = form.customfield_set.exclude(column__isnull=True).select_related("column")
+
+    def lookup(query, state, view, cycle, building):
+        """ Queries database for either properties or taxlots. """
+        if query and cycle:
+            possible_views = view.objects.filter(cycle=cycle)
+            if view == PropertyView:
+                states = state.objects.filter(propertyview__in=possible_views).filter(**query)
+            else:
+                states = state.objects.filter(taxlotview__in=possible_views).filter(**query)
+            buildings = building.objects.filter(views__state__in=states).distinct('pk')
+            if buildings:
+                return buildings
+        return None
+
+    cycles = Cycle.objects.filter(organization_id=org, end__isnull=False).order_by('end')
+    for ticket in tickets:
+        lookups = {'PropertyState': {}, 'TaxLotState': {}}
+        for f in fields:
+            # Locates value from ticket that will be searched for in BEAM
+            if f.field_name in ticket.extra_data \
+                    and ticket.extra_data[f.field_name] is not None and ticket.extra_data[f.field_name] != '':
+                value = ticket.extra_data[f.field_name]
+            elif hasattr(ticket, f.field_name) \
+                    and getattr(ticket, f.field_name, None) is not None and getattr(ticket, f.field_name, None) != '':
+                value = getattr(ticket, f.field_name, None)
+            else:
+                continue
+
+            # Creates a query term and pairs it with the value
+            # TODO: Check for the data type and cast value as that type before putting it in lookups?
+            if f.column.column_name and hasattr(f.column, 'is_extra_data') and f.column.table_name:
+                query_term = 'extra_data__%s' % f.column.column_name if f.column.is_extra_data else f.column.column_name
+                lookups[f.column.table_name][query_term] = value
+
+        property_lookup, taxlot_lookup = None, None
+        for c in cycles:
+            # if statement checks that if there's a prop query, there should be prop views in that cycle, as well as
+            # taxlot views if there's a taxlot query. if no queries, it doesn't matter whether it has views in that cycle.
+            if not property_lookup and lookups['PropertyState'] and PropertyView.objects.filter(cycle=c).exists():
+                property_lookup = lookup(lookups['PropertyState'], PropertyState, PropertyView, c, Property)
+                if property_lookup:
+                    ticket.beam_property.add(*property_lookup)
+
+            if not taxlot_lookup and lookups['TaxLotState'] and TaxLotView.objects.filter(cycle=c).exists():
+                taxlot_lookup = lookup(lookups['TaxLotState'], TaxLotState, TaxLotView, c, TaxLot)
+                if taxlot_lookup:
+                    ticket.beam_taxlot.add(*taxlot_lookup)
+
+            if (not (lookups['PropertyState'] and not property_lookup)) and \
+                    (not (lookups['TaxLotState'] and not taxlot_lookup)):
+                break
+
+
+@staff_member_required
 def pair_property_milestone(request, ticket_id):
     """
     Prompt user to select one of the Ticket's paired property's milestone to pair Ticket to
@@ -2290,7 +2404,7 @@ def pair_property_milestone(request, ticket_id):
 
     if request.method == 'POST':
         pv_id = request.POST.get('property_id', '').split('-')[1]
-        milestone_id = request.POST.get('milestone_id').split('-')[1]
+        milestone_id = request.POST.get('milestone_id').split('-')[2]
 
         pm = PropertyMilestone.objects.get(property_view_id=pv_id, milestone_id=milestone_id)
 
@@ -2323,6 +2437,16 @@ def pair_property_milestone(request, ticket_id):
         return return_to_ticket(request.user, request, helpdesk_settings, ticket)
 
     properties = ticket.beam_property.all()
+    org = ticket.ticket_form.organization
+
+    prop_display_column = Column.objects.filter(organization=org, column_name=org.property_display_field, table_name='PropertyState').first()
+    if prop_display_column:
+        if prop_display_column.is_extra_data:
+            prop_display_query = f'state__extra_data__{prop_display_column.column_name}'
+        else:
+            prop_display_query = f'state__{prop_display_column.column_name}'
+    else:
+        prop_display_query = 'state__address_line_1'
 
     # get all pathways attached to those properties and index them by property id
     # get all milestones for each pathway and index them by pathway id
@@ -2330,7 +2454,9 @@ def pair_property_milestone(request, ticket_id):
     pathways_per_property = {}
     milestones_per_pathway = {}
     for p in properties:
-        views = PropertyView.objects.filter(property_id=p.id)
+        # if there is no address, we will try to display the PM id instead
+        views = PropertyView.objects.filter(property_id=p.id)\
+                     .annotate(address=F(prop_display_query), pm_id=F('state__pm_property_id')).only('id', 'cycle')
         for view in views:
             if view.cycle not in properties_per_cycle:
                 properties_per_cycle[view.cycle] = [view]
@@ -2340,9 +2466,13 @@ def pair_property_milestone(request, ticket_id):
             pathways = Pathway.objects.filter(cycle_group__cyclegroupmapping__cycle_id=view.cycle.id)
             pathways_per_property[view.id] = pathways
 
+            milestones_per_pathway[view.id] = {}
             for pathway in pathways:
-                milestones_per_pathway[pathway.id] = Milestone.objects.filter(pathwaymilestone__pathway_id=pathway.id,
-                                                                              propertymilestone__property_view_id=view.id)
+                milestones_per_pathway[view.id][pathway.id] = Milestone.objects.filter(
+                    pathwaymilestone__pathway_id=pathway.id,
+                    propertymilestone__property_view_id=view.id
+                )
+
     return render(request, 'helpdesk/pair_property_milestone.html', {
         'ticket': ticket,
         'properties_per_cycle': properties_per_cycle,
