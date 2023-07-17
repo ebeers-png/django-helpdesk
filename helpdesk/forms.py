@@ -573,11 +573,6 @@ class AbstractTicketForm(CustomFieldMixin, forms.Form):
     form_queue = None
     hidden_fields = []
 
-    description = forms.CharField(
-        widget=forms.Textarea(attrs={'class': 'form-control'}),
-        help_text=Ticket.description.field.help_text
-    )
-
     queue = forms.ChoiceField(
         widget=forms.Select(attrs={'class': 'form-control'}),
         label=_('Queue'),
@@ -938,6 +933,11 @@ class TicketForm(AbstractTicketForm):
         choices=()
     )
 
+    description = forms.CharField(
+        widget=PreviewWidget,
+        help_text=Ticket.description.field.help_text
+    )
+
     def __init__(self, *args, **kwargs):
         """
         Add any custom fields that are defined to the form.
@@ -1011,6 +1011,11 @@ class PublicTicketForm(AbstractTicketForm):
         help_text=_('We will e-mail you when your ticket is updated.'),
     )
 
+    description = forms.CharField(
+        widget=forms.Textarea(attrs={'class': 'form-control'}),
+        help_text=""
+    )
+
     def __init__(self, hidden_fields=(), readonly_fields=(), *args, **kwargs):
         """
         Add any (non-staff) custom fields that are defined to the form
@@ -1034,7 +1039,6 @@ class PublicTicketForm(AbstractTicketForm):
         if self.form_queue is None:
             self.fields['queue'].choices = [('', '--------')] + [
                 (q.id, q.title) for q in public_queues]
-        self.fields['description'].help_text = ""
 
     def save(self, user, form_id=None):
         """
