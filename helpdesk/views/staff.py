@@ -28,7 +28,7 @@ from django.utils.html import escape
 from django.utils import timezone
 from django.views.generic.edit import FormView, UpdateView
 
-from helpdesk.forms import CUSTOMFIELD_DATE_FORMAT, CUSTOMFIELD_DATETIME_FORMAT
+from helpdesk.forms import CUSTOMFIELD_DATE_FORMAT, CUSTOMFIELD_DATETIME_FORMAT, PreviewWidget
 from helpdesk.query import (
     get_query_class,
     query_to_base64,
@@ -49,7 +49,8 @@ from helpdesk.decorators import (
 )
 from helpdesk.forms import (
     TicketForm, UserSettingsForm, EmailIgnoreForm, EditTicketForm, TicketCCForm,
-    TicketCCEmailForm, TicketCCUserForm, EditFollowUpForm, TicketDependencyForm, MultipleTicketSelectForm
+    TicketCCEmailForm, TicketCCUserForm, EditFollowUpForm, TicketDependencyForm, MultipleTicketSelectForm,
+    EditQueueForm, EditFormTypeForm
 )
 from helpdesk.lib import (
     safe_template_context,
@@ -70,7 +71,7 @@ from ..lib import format_time_spent
 from rest_framework import status
 from rest_framework.decorators import api_view
 
-from datetime import timedelta
+from datetime import timedelta, datetime
 
 from ..templated_email import send_templated_mail
 
@@ -131,6 +132,426 @@ def _get_queue_choices(queues):
     queue_choices += [(q.id, q.title) for q in queues]
     return queue_choices
 
+
+@helpdesk_staff_member_required
+def queue_list(request):
+    huser = HelpdeskUser(request.user)
+    queue_list = huser.get_queues()                # Queues in user's default org (or all if superuser)
+    
+    # user settings num tickets per page
+    if request.user.is_authenticated and hasattr(request.user, 'usersettings_helpdesk'):
+        queues_per_page = request.user.usersettings_helpdesk.tickets_per_page
+    else:
+        queues_per_page = 25
+
+    paginator = Paginator(
+        queue_list, queues_per_page)
+    try:
+        queue_list = paginator.page(request.GET.get(_('q_page'), 1))
+    except PageNotAnInteger:
+        queue_list = paginator.page(1)
+    except EmptyPage:
+        queue_list = paginator.page(
+            paginator.num_pages)
+
+    return render(request, 'helpdesk/queue_list.html', {
+        'queue_list': queue_list,
+        'debug': settings.DEBUG,
+    })
+
+
+@helpdesk_staff_member_required
+def create_queue(request):
+    org = request.user.default_organization.helpdesk_organization
+    if request.method == "GET":
+        form = EditQueueForm("create", organization=org.id)
+
+        return render(request, 'helpdesk/edit_queue.html', {
+            'form': form,
+            'action': "Create",
+            'debug': settings.DEBUG,
+        })
+    elif request.method == "POST":
+        form = EditQueueForm("create", request.POST, organization=org.id)
+
+        if form.is_valid():
+            queue = Queue(
+                organization = org,
+                title = form.cleaned_data['title'],
+                slug = form.cleaned_data['slug'], # no change
+                match_on = [i for i in form.cleaned_data['agg_match_on'] if i], # remove empty strings
+                match_on_addresses = [i for i in form.cleaned_data['agg_match_on_addresses'] if i], # remove empty strings
+                allow_public_submission = form.cleaned_data['allow_public_submission'],
+                escalate_days = form.cleaned_data['escalate_days'],
+                enable_notifications_on_email_events = form.cleaned_data['enable_notifications_on_email_events'],
+                default_owner = form.cleaned_data['default_owner'],
+                reassign_when_closed = form.cleaned_data['reassign_when_closed'],
+                dedicated_time = form.cleaned_data['dedicated_time'],
+            )
+            queue.save()
+            return HttpResponseRedirect(reverse('helpdesk:maintain_queues'))
+        
+        redo_form = EditQueueForm(
+            "create", 
+            request.POST, 
+            organization=org.id,
+            initial = {
+                'title': form.cleaned_data['title'],
+                'slug': form.data['slug'], # no change
+                'match_on': [i for i in form.cleaned_data['agg_match_on'] if i], # remove empty strings
+                'match_on_addresses': [i for i in form.cleaned_data['agg_match_on_addresses'] if i], # remove empty strings
+                'allow_public_submission': form.cleaned_data['allow_public_submission'],
+                'escalate_days': form.cleaned_data['escalate_days'],
+                'enable_notifications_on_email_events': form.cleaned_data['enable_notifications_on_email_events'],
+                'default_owner': form.cleaned_data['default_owner'],
+                'reassign_when_closed': form.cleaned_data['reassign_when_closed'],
+                'dedicated_time': form.cleaned_data['dedicated_time'],
+            }
+        )
+
+        return render(request, 'helpdesk/edit_queue.html', {
+            'form': redo_form,
+            'errors': form.errors,
+            'action': "Create",
+            'debug': settings.DEBUG,
+        })
+
+
+@helpdesk_staff_member_required
+def edit_queue(request, slug):
+    """Edit Queue"""
+    queue = get_object_or_404(Queue, slug=slug)
+    org = request.user.default_organization.helpdesk_organization
+
+    if request.method == "GET":
+        form = EditQueueForm(
+            "edit",
+            organization=org.id,
+            initial = {
+                'organization': queue.organization.id,
+                'title': queue.title,
+                'slug': queue.slug,
+                'match_on': queue.match_on,
+                'agg_match_on': queue.match_on,
+                'match_on_addresses': queue.match_on_addresses,
+                'agg_match_on_addresses': queue.match_on_addresses,
+                'allow_public_submission': queue.allow_public_submission,
+                'escalate_days': queue.escalate_days,
+                'enable_notifications_on_email_events': queue.enable_notifications_on_email_events,
+                'default_owner': queue.default_owner,
+                'reassign_when_closed': queue.reassign_when_closed,
+                'dedicated_time': queue.dedicated_time,
+                'importer': queue.importer if queue.importer else None,
+            }
+        )
+
+        return render(request, 'helpdesk/edit_queue.html', {
+            'queue': queue,
+            'form': form,
+            'action': "Edit",
+            'debug': settings.DEBUG,
+        })
+    elif request.method == "POST":
+        form = EditQueueForm("edit", request.POST, organization=org.id)
+        if form.is_valid():
+            queue.title = form.cleaned_data['title']
+            # queue.slug = form.cleaned_data['slug'] # no change
+            queue.match_on = [i for i in form.cleaned_data['agg_match_on'] if i] # remove empty strings
+            queue.match_on_addresses = [i for i in form.cleaned_data['agg_match_on_addresses'] if i] # remove empty strings
+            queue.allow_public_submission = form.cleaned_data['allow_public_submission']
+            queue.escalate_days = form.cleaned_data['escalate_days']
+            queue.enable_notifications_on_email_events = form.cleaned_data['enable_notifications_on_email_events']
+            queue.default_owner = form.cleaned_data['default_owner']
+            queue.reassign_when_closed = form.cleaned_data['reassign_when_closed']
+            queue.dedicated_time = form.cleaned_data['dedicated_time']
+            
+            queue.save()
+        return HttpResponseRedirect(reverse('helpdesk:maintain_queues')) 
+
+
+@helpdesk_staff_member_required
+def form_list(request):
+    org = request.user.default_organization.helpdesk_organization
+    form_list = FormType.objects.filter(organization=org)
+    
+    # user settings num tickets per page
+    if request.user.is_authenticated and hasattr(request.user, 'usersettings_helpdesk'):
+        forms_per_page = request.user.usersettings_helpdesk.tickets_per_page
+    else:
+        forms_per_page = 25
+
+    paginator = Paginator(
+        form_list, forms_per_page)
+    try:
+        form_list = paginator.page(request.GET.get(_('q_page'), 1))
+    except PageNotAnInteger:
+        form_list = paginator.page(1)
+    except EmptyPage:
+        form_list = paginator.page(
+            paginator.num_pages)
+
+    return render(request, 'helpdesk/form_list.html', {
+        'form_list': form_list,
+        'debug': settings.DEBUG,
+    })
+
+
+@helpdesk_staff_member_required
+def create_form(request):
+    org = request.user.default_organization.helpdesk_organization
+    
+    if request.method == "GET":
+        # Create empty form and save it to the database to generate the default Custom Fields.
+        formtype = FormType(organization = org, name="Unnamed Form")
+        formtype.save()
+        form = EditFormTypeForm(
+            initial = {
+                'id': formtype.id,
+                'name': formtype.name,
+                'description': formtype.description,
+                'queue': formtype.queue,
+                'public': formtype.public,
+                'staff': formtype.staff,
+                'unlisted': formtype.unlisted
+            },
+            initial_customfields = CustomField.objects.filter(ticket_form=formtype),
+            organization = org,
+            pk = formtype.id
+        )
+
+        return render(request, 'helpdesk/edit_form.html', {
+            'formtype': formtype,
+            'form': form,
+            'action': "Create",
+            'debug': settings.DEBUG,
+        })
+    elif request.method == "POST":
+        form = EditFormTypeForm(request.POST, organization = org)
+        formtype = get_object_or_404(FormType, pk=request.POST.get('id'))
+        formset = form.CustomFieldFormSet(request.POST)
+
+        if form.is_valid():
+            formtype.name = form.cleaned_data['name']
+            formtype.description = form.cleaned_data['description']
+            formtype.queue = form.cleaned_data['queue']
+            formtype.updated = datetime.now()
+            formtype.public = form.cleaned_data['public']
+            formtype.staff = form.cleaned_data['staff']
+            formtype.unlisted = form.cleaned_data['unlisted']
+            formtype.save() 
+
+            if formset.is_valid():
+                for df in formset.deleted_forms:
+                    if df.cleaned_data['id']: df.cleaned_data['id'].delete()
+
+                for cf in formset.cleaned_data:
+                    if not cf or cf['DELETE']: continue # continue to next item if form is empty or item is being deleted
+
+                    customfield = cf['id'] if cf['id'] else CustomField()
+
+                    customfield.field_name = cf['field_name']
+                    customfield.label = cf['label']
+                    customfield.help_text = cf['help_text']
+                    customfield.data_type = cf['data_type']
+                    customfield.max_length = cf['max_length']
+                    customfield.decimal_places = cf['decimal_places']
+                    customfield.empty_selection_list = cf['empty_selection_list']
+                    customfield.list_values = cf['list_values']
+                    customfield.notifications = cf['notifications']
+                    customfield.form_ordering = cf['form_ordering']
+                    customfield.required = cf['required']
+                    customfield.staff = cf['staff']
+                    customfield.public = cf['public']
+                    customfield.column = cf['column']
+                    if not customfield.created: customfield.created = datetime.now()
+                    customfield.modified = datetime.now()
+                    customfield.ticket_form = formtype
+                    customfield.save()
+                
+                return HttpResponseRedirect(reverse('helpdesk:maintain_forms'))
+            
+        form.customfield_formset = formset
+        return render(request, "helpdesk/edit_form.html", {
+            'formtype': formtype,
+            'form': form,
+            'formset': formset,
+            'action': "Create",
+            'debug': settings.DEBUG,             
+        })
+    
+
+@helpdesk_staff_member_required
+def edit_form(request, pk):
+    formtype = get_object_or_404(FormType, pk=pk)
+    
+    if request.method == "GET":
+        form = EditFormTypeForm(
+            initial = {
+                'id': formtype.id,
+                'name': formtype.name,
+                'description': formtype.description,
+                'queue': formtype.queue,
+                'public': formtype.public,
+                'staff': formtype.staff,
+                'unlisted': formtype.unlisted
+            },
+            initial_customfields = CustomField.objects.filter(ticket_form=formtype),
+            organization = formtype.organization,
+            pk = pk
+        )
+        
+        return render(request, 'helpdesk/edit_form.html', {
+            'formtype': formtype,
+            'form': form,
+            'action': "Edit",
+            'debug': settings.DEBUG,
+        })
+    elif request.method == "POST":
+        form = EditFormTypeForm(request.POST, organization = formtype.organization)
+        formset = form.CustomFieldFormSet(request.POST)
+
+        if form.is_valid():
+            formtype.name = form.cleaned_data['name']
+            formtype.description = form.cleaned_data['description']
+            formtype.queue = form.cleaned_data['queue']
+            formtype.updated = datetime.now()
+            formtype.public = form.cleaned_data['public']
+            formtype.staff = form.cleaned_data['staff']
+            formtype.unlisted = form.cleaned_data['unlisted']
+            formtype.save() 
+            
+            if formset.is_valid():
+                for df in formset.deleted_forms:
+                    if df.cleaned_data['id']: df.cleaned_data['id'].delete()
+
+                for cf in formset.cleaned_data:
+                    if not cf or cf['DELETE']: continue # continue to next item if form is empty or item is being deleted
+
+                    customfield = cf['id'] if cf['id'] else CustomField()
+                    customfield.field_name = cf['field_name']
+                    customfield.label = cf['label']
+                    customfield.help_text = cf['help_text']
+                    customfield.data_type = cf['data_type']
+                    customfield.max_length = cf['max_length']
+                    customfield.decimal_places = cf['decimal_places']
+                    customfield.empty_selection_list = cf['empty_selection_list']
+                    customfield.list_values = [i for i in cf['agg_list_values'] if i] # remove empty strings
+                    customfield.notifications = cf['notifications']
+                    customfield.form_ordering = cf['form_ordering']
+                    customfield.required = cf['required']
+                    customfield.staff = cf['staff']
+                    customfield.public = cf['public']
+                    customfield.column = cf['column']
+                    if not customfield.created: customfield.created = datetime.now()
+                    customfield.modified = datetime.now()
+                    customfield.ticket_form = formtype
+                    customfield.save()
+
+                return HttpResponseRedirect(reverse('helpdesk:maintain_forms'))
+
+        form.customfield_formset = formset
+        return render(request, "helpdesk/edit_form.html", {
+            'formtype': formtype,
+            'form': form,
+            'formset': formset,
+            'action': "Edit",
+            'debug': settings.DEBUG,             
+        })
+
+
+@helpdesk_staff_member_required
+def delete_form(request, pk):
+    form = get_object_or_404(FormType, pk=pk)
+    form.delete()
+    return HttpResponseRedirect(reverse('helpdesk:maintain_forms'))
+
+
+@helpdesk_staff_member_required
+def duplicate_form(request, pk):
+    formtype = get_object_or_404(FormType, pk=pk)
+    new_form = FormType(
+        organization = formtype.organization,
+        name = formtype.name + " - Copy",
+        description = formtype.description,
+        queue = formtype.queue,
+        public = formtype.public,
+        staff = formtype.staff,
+        unlisted = formtype.unlisted,
+        created = datetime.now(),
+        updated = datetime.now(),
+    )
+    new_form.save() # generate default custom fields
+    
+    for cf_name in formtype.get_extra_field_names():
+        cf = CustomField.objects.get(ticket_form=formtype, field_name=cf_name)
+        new_cf = CustomField(
+            field_name = cf.field_name,
+            label = cf.label,
+            help_text = cf.help_text,
+            data_type = cf.data_type,
+            max_length = cf.max_length,
+            decimal_places = cf.decimal_places,
+            empty_selection_list = cf.empty_selection_list,
+            list_values = cf.list_values,
+            notifications = cf.notifications,
+            form_ordering = cf.form_ordering,
+            required = cf.required,
+            staff = cf.staff,
+            public = cf.public,
+            column = cf.column,
+            created = datetime.now(),
+            modified = datetime.now(),
+            ticket_form = new_form
+        )
+        new_cf.save()
+    return HttpResponseRedirect(reverse('helpdesk:maintain_forms'))
+
+
+def copy_field(request):
+    """
+    Asynchonously copy CustomField to another form
+    """
+    form = EditFormTypeForm.CustomFieldFormSet.form(request.POST)
+    form_id = request.POST.get('form_id')
+    if form.is_valid():
+        cf = form.cleaned_data
+        target_form = FormType.objects.get(id=form_id)
+        base = cf['field_name'] + '_copy'
+        
+        high = CustomField.objects.filter(ticket_form=target_form, field_name__regex=(base + r'(\d+)')).order_by('field_name').last()
+        if high != None: # if copies exist, use the index after the highest to ensure availability
+            import re
+            match = re.search(base + r'(\d+)', high.field_name)
+            copy = base + str(int(match.group(1)) + 1)
+        else: # otherwise just use 1
+            copy = base + '1'
+
+        customfield = CustomField()
+        customfield.field_name = copy
+        customfield.label = cf['label']
+        customfield.help_text = cf['help_text']
+        customfield.data_type = cf['data_type']
+        customfield.max_length = cf['max_length']
+        customfield.decimal_places = cf['decimal_places']
+        customfield.empty_selection_list = cf['empty_selection_list']
+        customfield.list_values = [i for i in cf['agg_list_values'] if i] # remove empty strings
+        customfield.notifications = cf['notifications']
+        customfield.form_ordering = cf['form_ordering']
+        customfield.required = cf['required']
+        customfield.staff = cf['staff']
+        customfield.public = cf['public']
+        customfield.column = cf['column']
+        if not customfield.created: customfield.created = datetime.now()
+        customfield.modified = datetime.now()
+        customfield.ticket_form = target_form
+        customfield.save()
+
+        return JsonResponse({'copied': True})
+    else:
+        return JsonResponse({'copied': False, 'errors': form.errors})
+
+
+    
 
 @helpdesk_staff_member_required
 def dashboard(request):
@@ -1532,7 +1953,6 @@ def edit_ticket(request, ticket_id):
 
 edit_ticket = staff_member_required(edit_ticket)
 
-
 def attach_ticket_to_property_milestone(request, ticket):
     from seed.models import PropertyMilestone, Note
     from django.utils.timezone import now
@@ -2339,7 +2759,7 @@ def _pair_properties_by_form(request, form, tickets):
     from seed.models import PropertyState, TaxLotState, TaxLotView, PropertyView, Cycle
 
     org = form.organization.id
-    fields = form.customfield_set.exclude(column__isnull=True).select_related("column")
+    fields = form.customfield_set.exclude(column__isnull=True).exclude(lookup=False).select_related("column")
 
     def lookup(query, state, view, cycle, building):
         """ Queries database for either properties or taxlots. """
@@ -2482,6 +2902,207 @@ def pair_property_milestone(request, ticket_id):
     })
 
 
+def load_copy_to_beam(request, ticket_id):
+    """
+    Loads page for copying ticket data to BEAM.
+    """
+    from seed.models import PropertyView, Cycle, PropertyState, TaxLotView
+
+    ticket = get_object_or_404(Ticket, id=ticket_id)
+    org = ticket.ticket_form.organization
+
+    prop_display_column = Column.objects.filter(organization=org, column_name=org.property_display_field, table_name='PropertyState').first()
+    if prop_display_column:
+        prop_display_query = f'state__extra_data__{prop_display_column.column_name}' if prop_display_column.is_extra_data else f'state__{prop_display_column.column_name}'
+    else:
+        prop_display_query = 'state__address_line_1'
+
+    taxlot_display_column = Column.objects.filter(organization=org, column_name=org.taxlot_display_field, table_name='TaxLotState').first()
+    if taxlot_display_column:
+        taxlot_display_query = f'state__extra_data__{taxlot_display_column.column_name}' if taxlot_display_column.is_extra_data else f'state__{taxlot_display_column.column_name}'
+    else:
+        taxlot_display_query = 'state__address_line_1'
+
+    properties_per_cycle = {}
+    views = PropertyView.objects.filter(property__in=ticket.beam_property.all()) \
+        .annotate(address=F(prop_display_query), building_id=F('state__pm_property_id')).only('id', 'cycle')
+    for view in views:
+        if view.cycle not in properties_per_cycle:
+            properties_per_cycle[view.cycle] = [view]
+        else:
+            properties_per_cycle[view.cycle].append(view)
+
+    taxlots_per_cycle = {}
+    views = TaxLotView.objects.filter(taxlot__in=ticket.beam_taxlot.all()) \
+        .annotate(address=F(taxlot_display_query), building_id=F('state__jurisdiction_tax_lot_id')).only('state_id', 'cycle')
+    for view in views:
+        if view.cycle not in taxlots_per_cycle:
+            taxlots_per_cycle[view.cycle] = [view]
+        else:
+            taxlots_per_cycle[view.cycle].append(view)
+
+    cycles = set(list(properties_per_cycle.keys()) + list(taxlots_per_cycle.keys()))
+
+    return render(request, 'helpdesk/ticket_copy_to_beam.html', {
+        'ticket': ticket,
+        'cycles': cycles,
+        'properties_per_cycle': properties_per_cycle,
+        'taxlots_per_cycle': taxlots_per_cycle,
+        'debug': settings.DEBUG,
+    })
+
+
+def get_building_data(request, ticket_id):
+    """Given a cycle ID and view ID, loads ticket data and state data for the copy_to_beam page."""
+    from seed.models import Cycle
+    from seed.serializers.properties import PropertyStateSerializer
+    from seed.serializers.taxlots import TaxLotStateSerializer
+
+    ticket = get_object_or_404(Ticket, id=ticket_id)
+    if request.is_ajax and request.method == "GET":
+
+        org = ticket.ticket_form.organization
+        inventory_type = request.GET.get('inventory_type', 'PropertyState')
+        cycle_id = request.GET.get('cycle_id', 0)
+        view_id = request.GET.get('view_id', 0)
+
+        cycle = Cycle.objects.filter(organization=org, id=cycle_id).first()
+        if inventory_type == 'PropertyState':
+            view = PropertyView.objects.filter(state__organization=org, id=view_id).first()
+            state = PropertyStateSerializer(view.state).data
+        else:
+            view = TaxLotView.objects.filter(state__organization=org, id=view_id).first()
+            state = TaxLotStateSerializer(view.state).data
+        ticket_data = []
+        beam_data = []
+        if cycle:
+            form_fields = ticket.ticket_form.customfield_set.exclude(column__isnull=True).select_related("column")
+            for f in form_fields:
+                if f.column.table_name == inventory_type:
+                    if f.field_name in ticket.extra_data \
+                            and ticket.extra_data[f.field_name] is not None and ticket.extra_data[f.field_name] != '':
+                        value = ticket.extra_data[f.field_name]
+                    elif hasattr(ticket, f.field_name) \
+                            and getattr(ticket, f.field_name, None) is not None and getattr(ticket, f.field_name, None) != '':
+                        value = getattr(ticket, f.field_name, None)
+                    else:
+                        value = ''
+
+                    # If the data types differ, we can't allow users to copy over the data.
+                    if f.data_type in ['varchar', 'text', 'email', 'url', 'ipaddress', 'slug', 'list']:
+                        data_type = 'string'
+                    elif f.data_type in ['date', 'datetime']:
+                        data_type = 'datetime'
+                    else:
+                        data_type = f.data_type
+
+                    ticket_data.append({
+                        'display': f.label,
+                        'field_name': f.field_name,
+                        'value': value,
+                        'data_type': data_type
+                    })
+
+                    value = ''
+                    if f.column.column_name and hasattr(f.column, 'is_extra_data') and f.column.table_name:
+                        if f.column.is_extra_data and f.column.column_name in state['extra_data']:
+                            value = state['extra_data'][f.column.column_name]
+                        elif not f.column.is_extra_data and f.column.column_name in state:
+                            value = state[f.column.column_name]
+
+                    # If the data types differ, we can't allow users to copy over the data.
+                    # Uses DATA_TYPE_PARSERS to avoid needing to update this section whenever the data types change!
+                    if f.column.data_type in Column.DATA_TYPE_PARSERS.keys():
+                        try:
+                            typed_value = Column.DATA_TYPE_PARSERS[f.column.data_type]("0")
+                        except ValueError:  # Invalid isoformat string: '0'
+                            data_type = 'datetime'
+                        else:
+                            if isinstance(typed_value, bool):
+                                data_type = 'boolean'
+                            elif isinstance(typed_value, str):
+                                data_type = 'string'
+                            elif isinstance(typed_value, float):
+                                data_type = 'decimal'
+                            elif isinstance(typed_value, int):
+                                data_type = 'integer'
+                            elif isinstance(typed_value, datetime):
+                                data_type = 'datetime'
+                            else:
+                                data_type = f.column.data_type
+
+                    beam_data.append({
+                        'display': f.column.display_name if f.column.display_name else f.column.column_name,
+                        'value': value,
+                        'column_name': f.column.column_name,
+                        'is_matching_criteria': f.column.is_matching_criteria,
+                        'data_type': data_type
+                    })
+
+        return JsonResponse({
+            "ticket_data": ticket_data,
+            'beam_data': beam_data
+        }, status=200)
+
+
+def update_building_data(request, ticket_id):
+    """
+    Given a cycle ID, view ID, and list of ticket fields, copies the data from those fields to their columns in BEAM.
+    """
+
+    from seed.models import PropertyView, Cycle, TaxLotView
+    from seed.views.v3.properties import PropertyViewSet
+    from seed.views.v3.taxlots import TaxlotViewSet
+
+    if request.is_ajax and request.method == "POST":
+        ticket = get_object_or_404(Ticket, id=ticket_id)
+        org = ticket.ticket_form.organization
+        # get the form data
+        inventory_type = request.POST.get('inventory_type', '')
+        cycle_id = request.POST.get('cycle_id', '')
+        view_id = request.POST.get('view_id', '')
+        fields = request.POST.getlist('fields[]', [])
+
+        cycle = get_object_or_404(Cycle, organization=org, id=cycle_id)
+        if inventory_type == 'PropertyState':
+            view = get_object_or_404(PropertyView, id=view_id)
+        else:
+            view = get_object_or_404(TaxLotView, id=view_id)
+        form_fields = ticket.ticket_form.customfield_set.filter(field_name__in=fields, column__isnull=False).select_related("column")
+        update_data, extra_data, data = {}, {}, {}
+        for f in form_fields:
+            if f.field_name in ticket.extra_data \
+                    and ticket.extra_data[f.field_name] is not None and ticket.extra_data[f.field_name] != '':
+                value = ticket.extra_data[f.field_name]
+            elif hasattr(ticket, f.field_name) \
+                    and getattr(ticket, f.field_name, None) is not None and getattr(ticket, f.field_name, None) != '':
+                value = getattr(ticket, f.field_name, None)
+            else:
+                value = ''
+            if f.column.is_extra_data:
+                extra_data[f.column.column_name] = value
+            else:
+                data[f.column.column_name] = value
+
+        # Create request to send to BEAM
+        update_data = {'state': data}
+        update_data['state']['extra_data'] = extra_data
+        update_request = HttpRequest()
+        update_request.method = 'PUT'
+        update_request.query_params = QueryDict('organization_id=' + str(org.id))
+        update_request.user = request.user
+        update_request.data = update_data
+        update_request.parser_context = {}
+
+        if inventory_type == 'PropertyState':
+            viewset = PropertyViewSet()
+        else:
+            viewset = TaxlotViewSet()
+        viewset.request = update_request
+        response = viewset.update(update_request, pk=view.id)
+        return response
+
+
 def add_remove_label(org_id, user, payload, inventory_type):
     """
 
@@ -2562,9 +3183,10 @@ def export_ticket_table(request, tickets):
     num_queues = request.POST.get('queue_length', '0')
 
     qs = Ticket.objects.filter(id__in=tickets)
+    org = request.user.default_organization.helpdesk_organization
     do_extra_data = int(num_queues) == 1
 
-    return export(qs, DatatablesTicketSerializer, do_extra_data=do_extra_data, visible_cols=visible_cols)
+    return export(qs, org, DatatablesTicketSerializer, do_extra_data=do_extra_data, visible_cols=visible_cols)
 
 
 @staff_member_required
@@ -2581,7 +3203,7 @@ def export_report(request):
                                ).order_by('created', 'ticket_form'
                                           ).select_related('ticket_form__organization', 'assigned_to', 'queue',
                                                            ).prefetch_related('followup_set__user', 'beam_property')
-    org = request.user.default_organization
+    org = request.user.default_organization.helpdesk_organization
 
     return export(qs, org, ReportTicketSerializer, paginate=paginate)
 
@@ -2642,7 +3264,7 @@ def export(qs, org, serializer, paginate=False, do_extra_data=True, visible_cols
     }
 
     # Split tickets up into separate forms, serialize, and concatenate them
-    report = pd.DataFrame()
+    report = []
     for ticket_form_id in ticket_form_ids:
         sub_qs = qs.filter(ticket_form_id=ticket_form_id)
 
@@ -2678,7 +3300,8 @@ def export(qs, org, serializer, paginate=False, do_extra_data=True, visible_cols
             renamed_row = OrderedDict((mappings.get(k, k), v if v else '') for k, v in row.items())
             output.append(renamed_row)
         output = pd.json_normalize(output)
-        report = report.append(output, ignore_index=True)
+        report.append(output)
+    report = pd.concat(report)
     report = report.set_index('Ticket ID')
 
     time_stamp = timezone.now().strftime('%Y%m%d_%H%M%S')
