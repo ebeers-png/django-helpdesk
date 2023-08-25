@@ -50,7 +50,7 @@ from seed.models import (
     Property,
     TaxLot,
 )
-
+import boto3
 
 logger = logging.getLogger(__name__)
 
@@ -1173,15 +1173,6 @@ class FollowUpAttachment(Attachment):
         on_delete=models.CASCADE,
         verbose_name=_('Follow-up'),
     )
-    def get_upload_path(self, filename):
-        path = os.path.join(settings.MEDIA_ROOT+"/", 'helpdesk/attachments/{ticket_for_url}-{secret_key}/{id_}'.format(
-                ticket_for_url=self.followup.ticket.ticket_for_url,
-                secret_key=self.followup.ticket.secret_key,
-                id_=self.followup.id), filename)
-
-        # Get a unique filename using the get_available_name method in default_storage
-        s = default_storage
-        return s.get_available_name(path)
 
     def attachment_path(self, filename):
         os.umask(0)
@@ -1194,7 +1185,7 @@ class FollowUpAttachment(Attachment):
             if not os.path.exists(att_path):
                 os.makedirs(att_path, 0o777)
         if settings.USE_S3 is True:
-            self.get_upload_path(filename)
+            return default_storage.get_available(att_path)
         return os.path.join(path, filename)
 
 
@@ -1205,13 +1196,6 @@ class KBIAttachment(Attachment):
         on_delete=models.CASCADE,
         verbose_name=_('Knowledgebase Article'),
     )
-    def get_upload_path(self, filename):
-        path = os.path.join(settings.MEDIA_ROOT+"/", 'helpdesk/attachments/kb/{category}/{kbi}'.format(
-            category=self.kbitem.category,
-            kbi=self.kbitem.id), filename)
-        # Get a unique filename using the get_available_name method in default_storage
-        s = default_storage
-        return s.get_available_name(path)
 
     def attachment_path(self, filename):
         os.umask(0)
@@ -1223,7 +1207,7 @@ class KBIAttachment(Attachment):
             if not os.path.exists(att_path):
                 os.makedirs(att_path, 0o777)
         if settings.USE_S3 is True:
-            self.get_upload_path(filename)
+            return default_storage.get_available_name(att_path)
         return os.path.join(path, filename)
 
 
