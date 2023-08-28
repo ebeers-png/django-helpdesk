@@ -1185,7 +1185,7 @@ class FollowUpAttachment(Attachment):
             if not os.path.exists(att_path):
                 os.makedirs(att_path, 0o777)
         if settings.USE_S3 is True:
-            return default_storage.get_available(att_path)
+            return default_storage.get_available(att_path+"/"+filename)
         return os.path.join(path, filename)
 
 
