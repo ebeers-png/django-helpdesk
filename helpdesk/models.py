@@ -1181,11 +1181,12 @@ class FollowUpAttachment(Attachment):
             secret_key=self.followup.ticket.secret_key,
             id_=self.followup.id)
         att_path = os.path.join(settings.MEDIA_ROOT, path)
+        s3_upload_path = att_path + path + filename
         if settings.DEFAULT_FILE_STORAGE == "django.core.files.storage.FileSystemStorage":
             if not os.path.exists(att_path):
                 os.makedirs(att_path, 0o777)
         if settings.USE_S3 is True:
-            return default_storage.get_available(att_path+"/"+filename)
+            return default_storage.get_available(s3_upload_path)
         return os.path.join(path, filename)
 
 
@@ -1203,11 +1204,12 @@ class KBIAttachment(Attachment):
             category=self.kbitem.category,
             kbi=self.kbitem.id)
         att_path = os.path.join(settings.MEDIA_ROOT, path)
+        s3_upload_path = att_path + path + filename
         if settings.DEFAULT_FILE_STORAGE == "django.core.files.storage.FileSystemStorage":
             if not os.path.exists(att_path):
                 os.makedirs(att_path, 0o777)
         if settings.USE_S3 is True:
-            return default_storage.get_available_name(att_path+"/"+filename)
+            return default_storage.get_available_name(s3_upload_path)
         return os.path.join(path, filename)
 
 
