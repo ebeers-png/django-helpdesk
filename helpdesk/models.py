@@ -31,6 +31,7 @@ import bleach
 from bleach.linkifier import LinkifyFilter
 from bleach.sanitizer import Cleaner
 from bleach_allowlist import markdown_tags, markdown_attrs, print_tags, print_attrs, all_styles
+from bleach.css_sanitizer import CSSSanitizer
 from urllib.parse import urlparse, quote
 from functools import partial
 
@@ -115,6 +116,31 @@ def _cleaner_shorten_url(attrs, new=False):
     return attrs
 
 
+def clean_html(text):
+    # bleach is deprecated, and nh3 is a better alternative, but it doesn't have a built-in CSS style sanitizer
+    # https://nh3.readthedocs.io/en/latest/
+    """
+    for k, v in markdown_attrs.items():
+        markdown_attrs[k] = set(v)
+    for k, v in print_attrs.items():
+        print_attrs[k] = set(v)
+
+    cleaned_text = nh3.clean(
+        text,
+        tags=set(markdown_tags),
+        attributes={**markdown_attrs}
+    )
+    """
+    css_sanitizer = CSSSanitizer(allowed_css_properties=['font-family', 'font-size'])
+    cleaned_text = bleach.clean(
+        text,
+        tags=markdown_tags,
+        attributes={**markdown_attrs, 'p': 'style', 'blockquote': 'style'},
+        css_sanitizer=css_sanitizer,
+    )
+    return cleaned_text
+
+
 def get_markdown(text, org, kb=False):
     if not text:
         return ""
@@ -126,25 +152,25 @@ def get_markdown(text, org, kb=False):
                   'markdown.extensions.fenced_code',  # required for collapsing sections
                   'markdown.extensions.tables']  # requested
     collapsible_attrs = {}
-    anchor_attrs = {}
+    header_attrs = {}
 
     if kb:
         extensions.append('markdown.extensions.attr_list')
-        extensions.append('markdown.extensions.md_in_html')
-        collapsible_attrs = {"div": ["data-target", "data-toggle", "data-parent", "role",
+        collapsible_attrs = {"p": ["data-target", "data-toggle", "data-parent", "role",
                                    'aria-controls', 'aria-expanded', 'aria-labelledby', 'id']}
-        anchor_attrs = {"p":['id'], "h1": ['id'],"h2": ['id'], "h3": ['id'], "h4": ['id'], "h5": ['id'], "h6": ['id'],}
+        header_attrs = {"h1": ['id'], "h2": ['id'], "h3": ['id'], "h4": ['id'], "h5": ['id'], "h6": ['id']}
+
+    css_sanitizer = CSSSanitizer(allowed_css_properties=all_styles)
     cleaner = Cleaner(
         filters=[partial(LinkifyFilter, callbacks=[partial(_cleaner_set_target, domain), _cleaner_shorten_url])],
         tags=markdown_tags + print_tags,
         attributes={**markdown_attrs,
                     **print_attrs,
                     **collapsible_attrs,
-                    **anchor_attrs},
-        styles=all_styles
+                    **header_attrs},
+        css_sanitizer=css_sanitizer
     )
     cleaned = cleaner.clean(markdown(text, extensions=extensions))
-    # breakpoint()
     return mark_safe(cleaned)
 
 
@@ -563,17 +589,36 @@ class Ticket(models.Model):
         if dont_send_to is not None:
             recipients.update(dont_send_to)
 
-        recipients.add(self.queue.email_address)
+        if self.queue.email_address:
+            recipients.add(self.queue.email_address.strip('<>'))
+        recipients.add(self.queue.from_address.strip('<>'))
+        if organization and organization.sender:
+            recipients.add(organization.sender.email_address.strip('<>'))
 
+        ignored_from_queue = self.queue.ignoreemail_set.filter(prevent_send=True)
+        ignored_from_org = self.queue.organization.ignoreemail_set.filter(prevent_send=True, queues__isnull=True)
+
+        recipients = set([s.strip() for s in recipients if s])
         def send(role, recipient):
-            if recipient and recipient not in recipients and role in roles:
-                template, context = roles[role]
-                send_templated_mail(template, context, recipient, sender=self.queue.from_address,
-                                    organization=organization, ticket_id=self.pk, **kwargs)
-                recipients.add(recipient)
+            if recipient:
+                recipient = recipient.strip()
+                if recipient not in recipients and role in roles:
+                    ignore_flag = False
+                    for i in ignored_from_queue:
+                        if i.test(recipient):
+                            ignore_flag = True
+                    for i in ignored_from_org:
+                        if i.test(recipient):
+                            ignore_flag = True
+
+                    if not ignore_flag:
+                        template, context = roles[role]
+                        # todo: send_templated_mail doesn't actually use the sender given to it?
+                        send_templated_mail(template, context, recipient, sender=self.queue.from_address,
+                                            organization=organization, ticket_id=self.pk, **kwargs)
+                        recipients.add(recipient)
 
         # Attempts to send an email to every possible field.
-
         if self.submitter_email:
             send('submitter', self.submitter_email)
         if self.contact_email:
@@ -1089,7 +1134,6 @@ class FollowUpAttachment(Attachment):
     )
 
     def attachment_path(self, filename):
-
         os.umask(0)
         path = 'helpdesk/attachments/{ticket_for_url}-{secret_key}/{id_}'.format(
             ticket_for_url=self.followup.ticket.ticket_for_url,
@@ -1111,7 +1155,6 @@ class KBIAttachment(Attachment):
     )
 
     def attachment_path(self, filename):
-
         os.umask(0)
         path = 'helpdesk/attachments/kb/{category}/{kbi}'.format(
             category=self.kbitem.category,
@@ -1139,12 +1182,7 @@ class PreSetReply(models.Model):
         verbose_name = _('Pre-set reply')
         verbose_name_plural = _('Pre-set replies')
 
-    queues = models.ManyToManyField(
-        Queue,
-        blank=True,
-        help_text=_('Leave blank to allow this reply to be used for all '
-                    'queues, or select those queues you wish to limit this reply to.'),
-    )
+    organization = models.ForeignKey(Organization, on_delete=models.CASCADE)
 
     name = models.CharField(
         _('Name'),
@@ -1153,15 +1191,26 @@ class PreSetReply(models.Model):
                     'shown to the user.'),
     )
 
+    queues = models.ManyToManyField(
+        Queue,
+        blank=True,
+        help_text=_('Leave blank to allow this reply to be used for all '
+                    'queues, or select those queues you wish to limit this reply to.'),
+    )
+
     body = models.TextField(
         _('Body'),
-        help_text=_('Context available: {{ ticket }} - ticket object (eg '
-                    '{{ ticket.title }}); {{ queue }} - The queue; and {{ user }} '
-                    '- the current user.'),
+        help_text=_(markdown_allowed() + '<br/>Context available:<br/>'
+                    '{{ ticket }}: the ticket object (eg {{ ticket.title }})<br/>'
+                    '{{ queue }}: the queue<br/>'
+                    '{{ user }}: the current user.<br/>'),
     )
 
     def __str__(self):
         return '%s' % self.name
+
+    def get_markdown(self):
+        return get_markdown(self.body, self.organization)
 
 
 class EscalationExclusion(models.Model):
@@ -1263,6 +1312,9 @@ class EmailTemplate(models.Model):
         ordering = ('template_name', 'locale')
         verbose_name = _('e-mail template')
         verbose_name_plural = _('e-mail templates')
+
+    def clean_html(self):
+        return clean_html(self.html)
 
 
 class KBCategory(models.Model):
@@ -1532,24 +1584,23 @@ class KBItem(models.Model):
 
             def __call__(self, match):
                     self.count += 1
-                    return self.pattern.format(self.count).replace('\x01', match[1])
+                    return self.pattern.format(self.count)
             
         anchor_target_pattern = r'{\:\s*#(\w+)\s*}'
         anchor_link_pattern = r'\[(.+)\]\(#(\w+)\)'
         new_answer, anchor_target_count = re.subn(anchor_target_pattern, "{: #anchor-\g<1> }", self.answer)
         new_answer, anchor_link_count = re.subn(anchor_link_pattern, "[\g<1>](#anchor-\g<2>)", new_answer)
 
-        title_pattern = r'^(.*)\n!~!'
+        title_pattern = r'!~!'
         body_pattern = r'~!~'
-        title = "<div markdown='1' class='card mb-2'>\n<div markdown='1' id=\"header{0}\" class='btn btn-link card-header h5' " \
-                "style='text-align: left; 'data-toggle='collapse' data-target='#collapse{0}' role='region' " \
-                "aria-expanded='false' aria-controls='collapse{0}'>\1\n{{: .mb-0}}</div>\n" \
-                "<div markdown='1' id='collapse{0}' class='collapse card-body mt-1' role='region'" \
-                "aria-labelledby='header{0}' data-parent='#header{0}' style='padding-top:0;padding-bottom:0;margin:0;'>"
-        body = "</div>\n</div>"
+        title = "{{: .card .d-block .btn .btn-link style='text-align: left; border-bottom-left-radius: 0; border-bottom-right-radius: 0;' " \
+                "data-toggle='collapse' data-target='#collapse{0}' role='region' " \
+                "aria-expanded='false' aria-controls='collapse{0}' .card-header #header{0} .h5 .mb-0 }}"
+        body = "{{ #collapse{0} .collapse .border role='region' aria-labelledby='header{0}' data-parent='#header{0}' " \
+               "style='padding-top:0;padding-bottom:0;margin:0;border-top-left-radius: 0; border-top-right-radius: 0;' .card-body }}"
 
-        new_answer, title_count = re.subn(title_pattern, MarkdownNumbers(start=1, pattern=title), new_answer, flags=re.MULTILINE)
-        new_answer, body_count = re.subn(body_pattern, body, new_answer)
+        new_answer, title_count = re.subn(title_pattern, MarkdownNumbers(start=1, pattern=title), new_answer)
+        new_answer, body_count = re.subn(body_pattern, MarkdownNumbers(start=1, pattern=body), new_answer)
         if (anchor_target_count != 0) or (title_count != 0 and title_count == body_count):
             return get_markdown(new_answer, self.category.organization, kb=True)
         return get_markdown(self.answer, self.category.organization)
@@ -1740,11 +1791,13 @@ class IgnoreEmail(models.Model):
         verbose_name = _('Ignored e-mail address')
         verbose_name_plural = _('Ignored e-mail addresses')
 
-    importers = models.ManyToManyField(
-        'seed.EmailImporter',
+    organization = models.ForeignKey(Organization, on_delete=models.CASCADE)
+
+    queues = models.ManyToManyField(
+        Queue,
         blank=True,
-        help_text=_('Leave blank for this e-mail to be ignored on all importer emails, '
-                    'or select those importers you wish to ignore this e-mail for.'),
+        help_text=_('Leave blank for this e-mail to be ignored on all queue emails, '
+                    'or select those queues you wish to ignore this e-mail for.'),
     )
 
     name = models.CharField(
@@ -1759,8 +1812,16 @@ class IgnoreEmail(models.Model):
         editable=False
     )
 
+    modified = models.DateField(
+        _('Last Modified'),
+        help_text=_('Date on which this e-mail address was last modified'),
+        blank=True,
+        default=None,
+        editable=False
+    )
+
     email_address = models.CharField(
-        _('E-Mail Address'),
+        _('Email Address'),
         max_length=150,
         help_text=_('Enter a full e-mail address, or portions with '
                     'wildcards, eg *@domain.com or postmaster@*.'),
@@ -1774,23 +1835,27 @@ class IgnoreEmail(models.Model):
                     'If this is unticked, emails from this address will be deleted.'),
     )
 
+    ignore_import = models.BooleanField("Ignore imports from this?", default=False, help_text="If checked, emails sent from this address will not be created as tickets.")
+    prevent_send = models.BooleanField("Prevent sending to this?", default=True, help_text="If checked, emails from Helpdesk will not be sent to this address.")
+
     def __str__(self):
         return '%s <%s>' % (self.name, self.email_address)
 
     def save(self, *args, **kwargs):
         if not self.date:
             self.date = timezone.now()
+        self.modified = timezone.now()
         return super(IgnoreEmail, self).save(*args, **kwargs)
 
-    def importer_list(self):
+    def queue_list(self):
         """Return a list of the importers this IgnoreEmail applies to.
         If this IgnoreEmail applies to ALL importers, return '*'.
         """
-        importers = self.importers.all().order_by('email_address')
-        if len(importers) == 0:
+        queues = self.queues.all().order_by('email_address')
+        if len(queues) == 0:
             return '*'
         else:
-            return ', '.join([str(i) for i in importers])
+            return ', '.join([str(i) for i in queues])
 
     def test(self, email):
         """
