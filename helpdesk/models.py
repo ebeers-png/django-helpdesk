@@ -43,14 +43,35 @@ from helpdesk import settings as helpdesk_settings
 from helpdesk.decorators import is_helpdesk_staff
 
 from .templated_email import send_templated_mail
-from django.core.files.storage import default_storage
+import logging
+import boto3
+from botocore.exceptions import ClientError
 from seed.lib.superperms.orgs.models import Organization, get_helpdesk_count_by_domain
 from seed.models import (
     Column,
     Property,
     TaxLot,
 )
-import boto3
+
+def create_presigned_post(bucket_name, object_name,
+                          fields=None, conditions=None, expiration=3600):
+    """Generate a presigned URL S3 POST request to upload a file
+    """
+
+    # Generate a presigned S3 POST URL
+    s3_client = boto3.client('s3')
+    try:
+        response = s3_client.generate_presigned_post(bucket_name,
+                                                     object_name,
+                                                     Fields=fields,
+                                                     Conditions=conditions,
+                                                     ExpiresIn=expiration)
+    except ClientError as e:
+        logging.error(e)
+        return None
+
+    # The response contains the presigned URL and required fields
+    return response
 
 logger = logging.getLogger(__name__)
 
@@ -1185,7 +1206,7 @@ class FollowUpAttachment(Attachment):
             if not os.path.exists(att_path):
                 os.makedirs(att_path, 0o777)
         if settings.USE_S3 is True:
-            return default_storage.get_available_name(att_path+"/"+filename)
+            return create_presigned_post(settings.AWS_STORAGE_BUCKET_NAME, att_path)
         return os.path.join(path, filename)
 
 
@@ -1207,7 +1228,7 @@ class KBIAttachment(Attachment):
             if not os.path.exists(att_path):
                 os.makedirs(att_path, 0o777)
         if settings.USE_S3 is True:
-            return default_storage.get_available_name(att_path+"/"+filename)
+            return create_presigned_post(settings.AWS_STORAGE_BUCKET_NAME, att_path)
         return os.path.join(path, filename)
 
 
