@@ -174,7 +174,14 @@
                 }
             },
             error: function (response) {
-                console.log(response);
+                if (response.status === 403 && response.responseJSON.refresh_url) {
+                    // https://mozilla-django-oidc.readthedocs.io/en/stable/xhr.html
+                    if (confirm("Your session expired while retrieving building data from the cycle. Please refresh the page (or click the OK button) to resume your session.")) {
+                        location.reload();
+                    }
+                } else {
+                    console.log(response);
+                }
             }
         });
     };
