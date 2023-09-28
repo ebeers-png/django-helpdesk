@@ -75,7 +75,7 @@ from datetime import timedelta, datetime
 from ..templated_email import send_templated_mail
 
 from seed.models import PropertyView, Property, TaxLotView, TaxLot, Column
-from urllib.parse import urlparse, urlunparse
+from urllib.parse import urlparse, parse_qs, urlencode
 from django.http import QueryDict
 User = get_user_model()
 Query = get_query_class()
@@ -96,26 +96,24 @@ def set_user_timezone(request):
 
 
 @helpdesk_staff_member_required
-def set_default_org(request, user_id, org_id):
+def set_default_org(request, org_id):
     """
     Change the default org of the user based on their dropdown menu selection
     Reload them back to the same page
     """
-    from seed.landing.models import SEEDUser as User
-    from seed.lib.superperms.orgs.models import Organization
-    user = User.objects.get(pk=user_id)
-    user.default_organization_id = org_id
-    user.save()
+    user = request.user
+    org_id = int(org_id)
+    if user.organizationuser_set.filter(organization_id=org_id).exists():
+        user.default_organization_id = org_id
+        user.save()
+    next_page = request.GET.get('next', '/')
 
-    # todo The query is changed, which is good, but the path didn't, and that can be wrong. grrr
-    # complicated way of replacing the org query with the new org's name
-    # https://stackoverflow.com/questions/5755150/altering-one-query-parameter-in-a-url-django
-    (scheme, netloc, path, params, query, fragment) = urlparse(request.META['HTTP_REFERER'])
-    query_dict = QueryDict(query).copy()
-    query_dict['org'] = Organization.objects.get(id=org_id).name
-    query = query_dict.urlencode()
-    url = urlunparse((scheme, netloc, path, params, query, fragment))
-    return redirect(url)
+    # Remove ?org= from url
+    next_url = urlparse(next_page)
+    params = parse_qs(next_url.query)
+    params.pop('org', None)
+    new_next_url = next_page.replace(next_url.query, urlencode(params))
+    return HttpResponseRedirect(new_next_url)
 
 
 @helpdesk_staff_member_required

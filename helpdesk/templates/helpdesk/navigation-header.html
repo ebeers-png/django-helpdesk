@@ -35,7 +35,7 @@
             {% if user.is_anonymous %}
             <a class="dropdown-item" href="{{ request.get_full_path }}?org={{ org.name }}">
             {% else %}
-            <a class="dropdown-item" href="{% url 'helpdesk:set_default_org' user_id=user.id org_id=org.id %}">
+            <a class="dropdown-item" href="{% url 'helpdesk:set_default_org' org_id=org.id %}?next={{ request.get_full_path|urlencode }}">
             {% endif %}
               {{ org.name }} {% if org.id == user_info.default_org.id %}<i class="fa fa-check"></i>{% endif %}
             </a>
