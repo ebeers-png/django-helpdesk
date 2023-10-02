@@ -34,6 +34,7 @@ from bleach_allowlist import markdown_tags, markdown_attrs, print_tags, print_at
 from bleach.css_sanitizer import CSSSanitizer
 from urllib.parse import urlparse, quote
 from functools import partial
+from django.core.files.storage import default_storage
 
 import pinax.teams.models
 
@@ -52,26 +53,6 @@ from seed.models import (
     Property,
     TaxLot,
 )
-
-def create_presigned_post(bucket_name, object_name,
-                          fields=None, conditions=None, expiration=3600):
-    """Generate a presigned URL S3 POST request to upload a file
-    """
-
-    # Generate a presigned S3 POST URL
-    s3_client = boto3.client('s3')
-    try:
-        response = s3_client.generate_presigned_post(bucket_name,
-                                                     object_name,
-                                                     Fields=fields,
-                                                     Conditions=conditions,
-                                                     ExpiresIn=expiration)
-    except ClientError as e:
-        logging.error(e)
-        return None
-
-    # The response contains the presigned URL and required fields
-    return response
 
 logger = logging.getLogger(__name__)
 
@@ -1206,7 +1187,7 @@ class FollowUpAttachment(Attachment):
             if not os.path.exists(att_path):
                 os.makedirs(att_path, 0o777)
         if settings.USE_S3 is True:
-            return create_presigned_post(settings.AWS_STORAGE_BUCKET_NAME, att_path)
+            return default_storage.get_available(att_path+"/"+filename)
         return os.path.join(path, filename)
 
 
@@ -1228,7 +1209,7 @@ class KBIAttachment(Attachment):
             if not os.path.exists(att_path):
                 os.makedirs(att_path, 0o777)
         if settings.USE_S3 is True:
-            return create_presigned_post(settings.AWS_STORAGE_BUCKET_NAME, att_path)
+            return default_storage.get_available(att_path+"/"+filename)
         return os.path.join(path, filename)
 
 
