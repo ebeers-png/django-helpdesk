@@ -15,10 +15,12 @@ import re
 import socket
 import ssl
 from datetime import timedelta
+import dateutil
 from email.utils import getaddresses, parseaddr
 from os.path import isfile, join
 from time import ctime
 from functools import reduce
+from buildingid.code import RE_PATTERN_
 
 from bs4 import BeautifulSoup
 from django.conf import settings as django_settings
@@ -35,7 +37,7 @@ from exchangelib import FileAttachment, ItemAttachment
 
 from helpdesk import settings
 from helpdesk.lib import safe_template_context, process_attachments
-from helpdesk.models import Ticket, TicketCC, FollowUp, IgnoreEmail, FormType, CustomField
+from helpdesk.models import Ticket, TicketCC, FollowUp, IgnoreEmail, FormType, CustomField, is_extra_data
 from seed.models import EmailImporter, GOOGLE, MICROSOFT
 from helpdesk.decorators import is_helpdesk_staff
 
@@ -50,10 +52,12 @@ STRIPPED_SUBJECT_STRINGS = [
     "RE: ",
     "FW: ",
     "Automatic reply: ",
+    "[EXTERNAL] "
 ]
 
 PATTERN_UID = re.compile(r'\d+ \(UID (?P<uid>\d+)\)')
 DEBUGGING = False
+UBID_PATTERN = RE_PATTERN_.pattern[1:len(RE_PATTERN_.pattern) - 1]  # removes ^ and $
 
 
 def parse_uid(data):
@@ -582,6 +586,10 @@ def create_object_from_email_message(message, ticket_id, payload, files, logger)
     sender_name = payload['sender'][0]
     sender_email = payload['sender'][1]
     org = queue.organization
+    date = payload.get('date', now)
+    ubids = re.findall(UBID_PATTERN, payload['body'])
+    if ubids:
+        ubids = ', '.join(['-'.join(s) for s in ubids])
 
     message_id = getattr(message, 'message_id', None) or parseaddr(getattr(message, 'Message-Id', None))[1]
     in_reply_to = getattr(message, 'in_reply_to', None) or parseaddr(getattr(message, 'In-Reply-To', None))[1]
@@ -630,6 +638,19 @@ def create_object_from_email_message(message, ticket_id, payload, files, logger)
                 ticket_form=ticket_form,
                 assigned_to=queue.default_owner if queue.default_owner else None,
             )
+            ticket.created = date
+
+            if ubids:
+                # if ubids were found in the body, look for a field with UBID in the title
+                ubid_field = ticket_form.customfield_set.filter(label__icontains='UBID', data_type='varchar')
+                if ubid_field.count() == 1:
+                    logger.debug("Found UBIDs, adding them to the ticket.")
+                    ubid_field = ubid_field.first()
+                    if is_extra_data(ubid_field.field_name):
+                        ticket.extra_data[ubid_field.field_name] = ubids
+                    else:
+                        setattr(ticket, ubid_field.field_name, ubids)
+
             ticket.save()
             logger.debug("Created new ticket %s-%s" % (ticket.queue.slug, ticket.id))
             new = True
@@ -637,7 +658,7 @@ def create_object_from_email_message(message, ticket_id, payload, files, logger)
     f = FollowUp.objects.create(
         ticket=ticket,
         title=_('E-Mail Received from %(sender_email)s' % {'sender_email': sender_email})[0:200],
-        date=now,
+        date=date,
         public=True,
         comment=payload.get('full_body', payload['body']) or "",
         message_id=message_id
@@ -735,27 +756,53 @@ def create_object_from_email_message(message, ticket_id, payload, files, logger)
 def object_from_message(message, importer, queues, logger):
     # 'message' must be an RFC822 formatted message.
     message = email.message_from_string(message)
+    sender, to_list, cc_list, date, subject = None, [], [], None, None
+
+    if importer.extract_eml_attachments:  # todo make a migration to check this off
+        # for processing forwarded mail
+        for part in message.walk():
+            if part.get_content_maintype() == 'message':
+                logger.info('Found .eml part. Extracting information now.')
+                for eml_part in part.walk():
+                    keys = eml_part.keys()
+                    if 'from' in keys or 'To' in keys or 'Cc' in keys:
+                        try:
+                            if not parseaddr(eml_part.get('from', None)) == ('', ''):
+                                sender = sender or parseaddr(eml_part.get('from', None))
+                            to_list = to_list or getaddresses(eml_part.get_all('To', []))
+                            cc_list = cc_list or getaddresses(eml_part.get_all('Cc', []))
+                            if eml_part.get('date', None):
+                                date = date or dateutil.parser.parse(eml_part.get('date'))
+                            if eml_part.get('subject', None):
+                                subject = subject or eml_part.get('subject')
+                        except Exception:
+                            pass
+                break
 
     # Replaces original helpdesk code "get_charset()", which wasn't an actual method ?
     charset = list(filter(lambda s: s is not None, message.get_charsets()))
     if charset:
         charset = charset[0]
 
-    subject = message.get('subject', _('Comment from e-mail'))
+    if not subject:
+        subject = message.get('subject', _('Comment from e-mail'))
     subject = decode_mail_headers(decode_unknown(charset, subject))
     for affix in STRIPPED_SUBJECT_STRINGS:
         subject = subject.replace(affix, "")
     subject = subject.strip()
 
-    sender = parseaddr(message.get('from', _('Unknown Sender')))
+    if not sender:
+        sender = parseaddr(message.get('from', None))
     if sender[1] == '':
         # Delete emails if the sender email cannot be parsed correctly. This ensures that
         # mailing list emails do not become tickets as well as malformatted emails
         return True
     sender_lower = sender[1].lower()
 
-    to_list = getaddresses(message.get_all('To', []))
-    cc_list = getaddresses(message.get_all('Cc', []))
+    if not to_list:
+        to_list = getaddresses(message.get_all('To', []))
+    if not cc_list:
+        cc_list = getaddresses(message.get_all('Cc', []))
 
     # Sort out which queue this email should go into #
     ticket, queue = None, None
@@ -945,6 +992,8 @@ def object_from_message(message, importer, queues, logger):
         'cc_list': cc_list,
         'to_list': to_list,
     }
+    if date:
+        payload['date'] = date
     return create_object_from_email_message(message, ticket, payload, files, logger=logger)
 
 
