@@ -44,9 +44,6 @@ from helpdesk import settings as helpdesk_settings
 from helpdesk.decorators import is_helpdesk_staff
 
 from .templated_email import send_templated_mail
-import logging
-import boto3
-from botocore.exceptions import ClientError
 from seed.lib.superperms.orgs.models import Organization, get_helpdesk_count_by_domain
 from seed.models import (
     Column,
