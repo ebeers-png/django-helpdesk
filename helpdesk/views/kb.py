@@ -374,11 +374,8 @@ def upload_attachment(request):
             attach.file = cf['file']
 
             attach.save()
-
-            print("This is the url", attach.file.url)
-            print("attach.file", attach.file)
-            
-            return JsonResponse({'uploaded': True, 'id': attach.id, 'url': create_presigned_url(settings.AWS_STORAGE_BUCKET_NAME, f'media/{str(attach.file.url).split("/media")[-1]}') if settings.USE_S3 is True else attach.file.url})
+                        
+            return JsonResponse({'uploaded': True, 'id': attach.id, 'url': create_presigned_url(settings.AWS_STORAGE_BUCKET_NAME, f'{attach.file}') if settings.USE_S3 is True else attach.file.url})
     else:
         return JsonResponse({'uploaded': False, 'errors': form.errors})
 
