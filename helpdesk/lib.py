@@ -157,6 +157,7 @@ def process_attachments(followup, attached_files):
                     size=attached.size,
                 )
                 att.save()
+                print("att.file.path is:", att.file.path)
 
                 if attached.size < max_email_attachment_size:
                     # Only files smaller than 512kb (or as defined in
