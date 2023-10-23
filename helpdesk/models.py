@@ -1108,7 +1108,8 @@ class Attachment(models.Model):
     )
     download_url = models.CharField(
         _('download_url'),
-        blank=True
+        blank=True,
+        max_length=None
     )
 
     filename = models.CharField(

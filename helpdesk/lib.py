@@ -171,18 +171,18 @@ def process_attachments(followup, attached_files):
                     followup=followup,
                     file=attached,
                     filename=filename,
+                    download_url = create_presigned_url(settings.AWS_STORAGE_BUCKET_NAME, att.file) if settings.USE_S3 is True else att.file.url,
                     mime_type=attached.content_type or
                     guess_type(filename, strict=False)[0] or
                     'application/octet-stream',
                     size=attached.size,
                 )
                 att.save()
-                download_url = create_presigned_url(settings.AWS_STORAGE_BUCKET_NAME, att.file) if settings.USE_S3 is True else att.file.url
 
                 if attached.size < max_email_attachment_size:
                     # Only files smaller than 512kb (or as defined in
                     # settings.HELPDESK_MAX_EMAIL_ATTACHMENT_SIZE) are sent via email.
-                    attachments.append((filename, att.file, att.mime_type, download_url))
+                    attachments.append((filename, att.file, att.mime_type))
         except Exception as e:
             logger.exception('Exception occurred while processing an attachment.')
 
