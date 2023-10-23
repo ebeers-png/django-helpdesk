@@ -7,9 +7,7 @@ lib.py - Common functions (eg multipart e-mail)
 """
 
 import logging
-import boto3
 from mimetypes import guess_type
-from botocore.exceptions import ClientError
 
 from django.conf import settings
 from django.utils.encoding import smart_text
@@ -18,24 +16,6 @@ from helpdesk.models import FollowUpAttachment
 
 
 logger = logging.getLogger(__name__)
-
-
-def create_presigned_url(bucket_name, object_name, expiration=604800):
-    # Generate a presigned URL for the S3 object
-    s3_client = boto3.client('s3', region_name="us-east-2")
-    try:
-        response = s3_client.generate_presigned_url('get_object',
-                                                    Params={'Bucket': bucket_name,
-                                                            'Key': object_name,
-                                                            'ResponseContentDisposition': 'attachment'},
-                                                    ExpiresIn=expiration)
-    except ClientError as e:
-        logging.error(e)
-        return None
-
-    # The response contains the presigned URL
-    return response
-
 
 
 def ticket_template_context(ticket):
@@ -171,14 +151,12 @@ def process_attachments(followup, attached_files):
                     followup=followup,
                     file=attached,
                     filename=filename,
-                    download_url = "",
                     mime_type=attached.content_type or
                     guess_type(filename, strict=False)[0] or
                     'application/octet-stream',
                     size=attached.size,
                 )
                 att.save()
-                print(attached.file)
 
                 if attached.size < max_email_attachment_size:
                     # Only files smaller than 512kb (or as defined in

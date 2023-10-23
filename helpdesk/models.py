@@ -36,6 +36,9 @@ from functools import partial
 from django.core.files.storage import default_storage
 
 import pinax.teams.models
+import boto3
+from botocore.exceptions import ClientError
+
 
 import uuid
 
@@ -51,6 +54,23 @@ from seed.models import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def create_presigned_url(bucket_name, object_name, expiration=604800):
+    # Generate a presigned URL for the S3 object
+    s3_client = boto3.client('s3', region_name=settings.AWS_DEFAULT_REGION)
+    try:
+        response = s3_client.generate_presigned_url('get_object',
+                                                    Params={'Bucket': bucket_name,
+                                                            'Key': object_name,
+                                                            'ResponseContentDisposition': 'attachment'},
+                                                    ExpiresIn=expiration)
+    except ClientError as e:
+        logging.error(e)
+        return None
+
+    # The response contains the presigned URL
+    return response
 
 
 def is_extra_data(field_name):
@@ -1106,11 +1126,6 @@ class Attachment(models.Model):
         upload_to=attachment_path,
         max_length=1000,
     )
-    download_url = models.CharField(
-        _('download_url'),
-        blank=True,
-        max_length=None
-    )
 
     filename = models.CharField(
         _('Filename'),
@@ -1153,6 +1168,10 @@ class Attachment(models.Model):
 
     def get_size(self):
         return self.file.file.size
+
+    def download_attachment(self):
+        print("self.file is:", self.file)
+        return create_presigned_url(settings.AWS_STORAGE_BUCKET_NAME, self.file)
 
     def attachment_path(self, filename):
         """Provide a file path that will help prevent files being overwritten, by
