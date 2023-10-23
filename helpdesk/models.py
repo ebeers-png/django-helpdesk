@@ -1170,8 +1170,7 @@ class Attachment(models.Model):
         return self.file.file.size
 
     def download_attachment(self):
-        print("self.file is:", self.file)
-        return create_presigned_url(settings.AWS_STORAGE_BUCKET_NAME, f"{settings.MEDIA_ROOT}/{self.file}")
+        return create_presigned_url(settings.AWS_STORAGE_BUCKET_NAME, f"{self.file}")
 
     def attachment_path(self, filename):
         """Provide a file path that will help prevent files being overwritten, by
