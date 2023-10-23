@@ -7,7 +7,9 @@ lib.py - Common functions (eg multipart e-mail)
 """
 
 import logging
+import boto3
 from mimetypes import guess_type
+from os.path import basename
 
 from django.conf import settings
 from django.utils.encoding import smart_text
@@ -141,6 +143,10 @@ def text_is_spam(text, request):
 
 def process_attachments(followup, attached_files):
     max_email_attachment_size = getattr(settings, 'HELPDESK_MAX_EMAIL_ATTACHMENT_SIZE', 512000)
+    access_key_id = settings.AWS_ACCESS_KEY_ID
+    secret_access_key = settings.AWS_SECRET_ACCESS_KEY
+    s3_bucket = settings.AWS_STORAGE_BUCKET_NAME
+    s3 = boto3.client("s3", aws_access_key_id=access_key_id, aws_secret_access_key=secret_access_key)
     attachments = []
     attached_files = [f for f in attached_files if f is not None]
     for attached in attached_files:
@@ -151,13 +157,13 @@ def process_attachments(followup, attached_files):
                     followup=followup,
                     file=attached,
                     filename=filename,
+                    download_url=s3.download_file(s3_bucket, basename(att.file), att.file) if settings.USE_S3 is True else att.file.url,
                     mime_type=attached.content_type or
                     guess_type(filename, strict=False)[0] or
                     'application/octet-stream',
                     size=attached.size,
                 )
                 att.save()
-                print("att.file.path is:", att.file)
 
                 if attached.size < max_email_attachment_size:
                     # Only files smaller than 512kb (or as defined in
