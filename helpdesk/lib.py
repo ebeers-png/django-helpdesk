@@ -171,13 +171,14 @@ def process_attachments(followup, attached_files):
                     followup=followup,
                     file=attached,
                     filename=filename,
-                    download_url = create_presigned_url(settings.AWS_STORAGE_BUCKET_NAME, att.file) if settings.USE_S3 is True else att.file.url,
+                    download_url = "",
                     mime_type=attached.content_type or
                     guess_type(filename, strict=False)[0] or
                     'application/octet-stream',
                     size=attached.size,
                 )
                 att.save()
+                print(attached.file)
 
                 if attached.size < max_email_attachment_size:
                     # Only files smaller than 512kb (or as defined in
