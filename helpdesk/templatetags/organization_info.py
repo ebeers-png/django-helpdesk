@@ -7,10 +7,38 @@ templatetags/organization_info.py - This template tag returns two pieces of info
     list of orgs        -- A queryset of the organizations the user is a part of if they are staff
 """
 from django import template
+from django.conf import settings
+import boto3
+from botocore.exceptions import ClientError
+import logging
 from seed.lib.superperms.orgs.models import Organization, OrganizationUser, get_helpdesk_orgs_for_domain, get_helpdesk_organizations
 from helpdesk.decorators import is_helpdesk_staff
 
 register = template.Library()
+
+
+def create_presigned_url(bucket_name, object_name, expiration=3600):
+    # Generate a presigned URL for the S3 object
+    s3_client = boto3.client('s3', region_name=settings.AWS_DEFAULT_REGION)
+    try:
+        response = s3_client.generate_presigned_url('get_object',
+                                                    Params={'Bucket': bucket_name,
+                                                            'Key': object_name},
+                                                    ExpiresIn=expiration)
+    except ClientError as e:
+        logging.error(e)
+        return None
+
+    # The response contains the presigned URL
+    return response
+
+
+
+# def display_logo():
+#     if settings.USE_S3 is True:
+#         return create_presigned_url(settings.AWS_STORAGE_BUCKET_NAME, f"")
+#     else:
+#         return ""
 
 
 @register.simple_tag
@@ -48,6 +76,7 @@ def organization_info(user, request):
                 url_org = request.GET.get('org')  # todo is this unsafe?
                 try:
                     org = Organization.objects.filter(name=url_org).first()
+                    print("This is the org:", org)
                     return_info['default_org'] = org.helpdesk_organization
                     return_info['url'] = '?org=' + org.name
                 except AttributeError:
@@ -55,6 +84,7 @@ def organization_info(user, request):
             else:
                 if not user.is_anonymous:
                     org = user.default_organization.helpdesk_organization
+                    print("second org:", org)
                     return_info['default_org'] = org
                     return_info['url'] = '?org=' + org.name
                 elif user.is_anonymous and len(helpdesk_orgs) > 1:
