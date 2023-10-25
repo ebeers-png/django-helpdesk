@@ -57,7 +57,7 @@ def organization_info(user, request):
     """
     try:
         domain_id = getattr(request, 'domain_id', 0)
-        return_info = {'default_org': None, 'orgs': [], 'url': ''}
+        return_info = {'default_org': None, 'orgs': [], 'url': '', 'logo': ''}
 
         if is_helpdesk_staff(user):  # todo - change to "staff of any org" ?
             helpdesk_orgs = get_helpdesk_organizations()
@@ -76,7 +76,6 @@ def organization_info(user, request):
                 url_org = request.GET.get('org')  # todo is this unsafe?
                 try:
                     org = Organization.objects.filter(name=url_org).first()
-                    print("This is the org:", org)
                     return_info['default_org'] = org.helpdesk_organization
                     return_info['url'] = '?org=' + org.name
                 except AttributeError:
@@ -84,7 +83,6 @@ def organization_info(user, request):
             else:
                 if not user.is_anonymous:
                     org = user.default_organization.helpdesk_organization
-                    print("second org:", org)
                     return_info['default_org'] = org
                     return_info['url'] = '?org=' + org.name
                 elif user.is_anonymous and len(helpdesk_orgs) > 1:
