@@ -11,6 +11,7 @@ from django.conf import settings
 import boto3
 from botocore.exceptions import ClientError
 import logging
+import re
 from seed.lib.superperms.orgs.models import Organization, OrganizationUser, get_helpdesk_orgs_for_domain, get_helpdesk_organizations
 from helpdesk.decorators import is_helpdesk_staff
 
@@ -66,6 +67,14 @@ def organization_info(user, request):
             return_info['orgs'] = helpdesk_orgs.filter(id__in=orgs)
             return_info['default_org'] = org
             return_info['url'] = '?org=' + org.name
+            logo_path = ""
+
+            if "logos/" not in logo_path:
+                logo_path = return_info["default_org"].logo.split("s")[0]+'s'+'/'+return_info["default_org"].logo.split("s")[-1]
+            else:
+                logo_path = return_info["default_org"].logo
+
+            return_info['logo'] = create_presigned_url(settings.AWS_STORAGE_BUCKET_NAME, f"{settings.MEDIA_ROOT}/{logo_path}")
 
         else:
             helpdesk_orgs = get_helpdesk_orgs_for_domain(domain_id)
