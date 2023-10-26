@@ -51,7 +51,7 @@
       <script>
         console.log("{{ user_info.org_logo }}")
       </script>
-      <img src="{{ MEDIA_URL }}{{ user_info.default_org.logo }}" title="{$:: 'BEAM' | translate $}"  style="max-height:70px;">
+      <img src="{{ user_info.org_logo }}{{ user_info.default_org.logo }}" title="{$:: 'BEAM' | translate $}"  style="max-height:70px;">
       {% endif %}
     </nav>
 <!-- Organization specific font and background -->
