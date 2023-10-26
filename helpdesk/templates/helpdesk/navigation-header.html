@@ -49,7 +49,7 @@
 
       {% if user_info.default_org.logo %}
       <script>
-        console.log(user_info.org_logo)
+        console.log("{{ user_info.org_logo }}")
       </script>
       <img src="{{ MEDIA_URL }}{{ user_info.default_org.logo }}" title="{$:: 'BEAM' | translate $}"  style="max-height:70px;">
       {% endif %}
