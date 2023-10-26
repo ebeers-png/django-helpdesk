@@ -67,17 +67,18 @@ def organization_info(user, request):
             return_info['orgs'] = helpdesk_orgs.filter(id__in=orgs)
             return_info['default_org'] = org
             return_info['url'] = '?org=' + org.name
-            logo_path = ""
+            # logo_path = ""
+            return_info["org_logo"] = return_info["default_org"].logo
 
-            if "logos/" not in logo_path:
-                logo_path = return_info["default_org"].logo.split("s")[0]+'s'+'/'+return_info["default_org"].logo.split("s")[-1]
-            else:
-                logo_path = return_info["default_org"].logo
+            # if "logos/" not in logo_path:
+            #     logo_path = return_info["default_org"].logo.split("s")[0]+'s'+'/'+return_info["default_org"].logo.split("s")[-1]
+            # else:
+            #     logo_path = return_info["default_org"].logo
 
-            if settings.USE_S3 is True:
-                return_info['org_logo'] = create_presigned_url(settings.AWS_STORAGE_BUCKET_NAME, f"{settings.MEDIA_ROOT}/{logo_path}")
-            else:
-                return_info['org_logo'] = settings.MEDIA_ROOT + logo_path
+            # if settings.USE_S3 is True:
+            #     return_info['org_logo'] = create_presigned_url(settings.AWS_STORAGE_BUCKET_NAME, f"{settings.MEDIA_ROOT}/{logo_path}")
+            # else:
+            #     return_info['org_logo'] = settings.MEDIA_ROOT + logo_path
 
         else:
             helpdesk_orgs = get_helpdesk_orgs_for_domain(domain_id)
