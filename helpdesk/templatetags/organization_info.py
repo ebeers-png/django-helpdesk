@@ -58,7 +58,7 @@ def organization_info(user, request):
     """
     try:
         domain_id = getattr(request, 'domain_id', 0)
-        return_info = {'default_org': None, 'orgs': [], 'url': '', 'logo': ''}
+        return_info = {'default_org': None, 'orgs': [], 'url': '', 'org_logo': ''}
 
         if is_helpdesk_staff(user):  # todo - change to "staff of any org" ?
             helpdesk_orgs = get_helpdesk_organizations()
@@ -74,7 +74,10 @@ def organization_info(user, request):
             else:
                 logo_path = return_info["default_org"].logo
 
-            return_info['logo'] = create_presigned_url(settings.AWS_STORAGE_BUCKET_NAME, f"{settings.MEDIA_ROOT}/{logo_path}")
+            if settings.USE_S3 is True:
+                return_info['org_logo'] = create_presigned_url(settings.AWS_STORAGE_BUCKET_NAME, f"{settings.MEDIA_ROOT}/{logo_path}")
+            else:
+                return_info['org_logo'] = settings.MEDIA_ROOT + logo_path
 
         else:
             helpdesk_orgs = get_helpdesk_orgs_for_domain(domain_id)

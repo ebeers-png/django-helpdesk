@@ -48,10 +48,7 @@
       </div>
 
       {% if user_info.default_org.logo %}
-      <script>
-        console.log(user_info.orgs +" "+ user_info.default_org + " " + user_info.url )
-      </script>
-      <img src="{{ user_info.logo }}" alt="logo.png"  style="max-height:70px;">
+      <img src="{{ user_info.org_logo }}" title="{$:: 'BEAM' | translate $}"  style="max-height:70px;">
       {% endif %}
     </nav>
 <!-- Organization specific font and background -->
