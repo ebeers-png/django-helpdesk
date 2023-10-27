@@ -80,6 +80,8 @@ def organization_info(user, request):
             else:
                 return_info['org_logo'] = settings.MEDIA_ROOT + logo_path
             
+            print("org logo", return_info['org_logo'])
+            
         else:
             helpdesk_orgs = get_helpdesk_orgs_for_domain(domain_id)
             if len(helpdesk_orgs) == 1:
