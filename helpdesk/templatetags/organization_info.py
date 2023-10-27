@@ -75,15 +75,11 @@ def organization_info(user, request):
             else:
                 logo_path = str(return_info["default_org"].logo)
             
-            print("logo path is:", logo_path)
-
-            # if settings.USE_S3 is True:
-            #     return_info['org_logo'] = create_presigned_url(settings.AWS_STORAGE_BUCKET_NAME, f"{settings.MEDIA_ROOT}/{logo_path}")
-            # else:
-            #     return_info['org_logo'] = settings.MEDIA_ROOT + logo_path
+            if settings.USE_S3 is True:
+                return_info['org_logo'] = create_presigned_url(settings.AWS_STORAGE_BUCKET_NAME, f"{settings.MEDIA_ROOT}/{logo_path}")
+            else:
+                return_info['org_logo'] = settings.MEDIA_ROOT + logo_path
             
-            print("print for return_info", return_info["default_org"].logo)
-
         else:
             helpdesk_orgs = get_helpdesk_orgs_for_domain(domain_id)
             if len(helpdesk_orgs) == 1:
