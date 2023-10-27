@@ -71,9 +71,9 @@ def organization_info(user, request):
             logo_path = ""
 
             if "logos/" not in logo_path:
-                logo_path = return_info["default_org"].logo.split("s")[0]+'s'+'/'+return_info["default_org"].logo.split("s")[-1]
+                logo_path = str(return_info["default_org"].logo).split("s")[0]+'s'+'/'+str(return_info["default_org"].logo).split("s")[-1]
             else:
-                logo_path = return_info["default_org"].logo
+                logo_path = str(return_info["default_org"].logo)
             
             print("logo path is:", logo_path)
 
