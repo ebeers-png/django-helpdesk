@@ -345,6 +345,7 @@ class EditKBItemForm(forms.ModelForm):
         self.attachment_formset.initial = initial_attach
 
         for form in self.attachment_formset.forms:
+            print("possible file path:", form.initial['file'].name)
             form.fields['file'].required = False
 
 

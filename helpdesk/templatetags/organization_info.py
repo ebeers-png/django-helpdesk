@@ -67,7 +67,6 @@ def organization_info(user, request):
             return_info['orgs'] = helpdesk_orgs.filter(id__in=orgs)
             return_info['default_org'] = org
             return_info['url'] = '?org=' + org.name
-            print("This is helpdesk staff section")
             logo_path = ""
 
             if "logos/" not in logo_path:
@@ -80,12 +79,10 @@ def organization_info(user, request):
             else:
                 return_info['org_logo'] = settings.MEDIA_ROOT + logo_path
             
-            print("org logo", return_info['org_logo'])
             
         else:
             helpdesk_orgs = get_helpdesk_orgs_for_domain(domain_id)
             if len(helpdesk_orgs) == 1:
-                print("Testig printing equal to 1", helpdesk_orgs)
                 return_info['default_org'] = helpdesk_orgs.first()
                 return_info['url'] = ''
             elif 'org' in request.GET:
@@ -94,7 +91,6 @@ def organization_info(user, request):
                     org = Organization.objects.filter(name=url_org).first()
                     return_info['default_org'] = org.helpdesk_organization
                     return_info['url'] = '?org=' + org.name
-                    print("Inside try statement", org)
                 except AttributeError:
                     pass
             else:
@@ -102,9 +98,7 @@ def organization_info(user, request):
                     org = user.default_organization.helpdesk_organization
                     return_info['default_org'] = org
                     return_info['url'] = '?org=' + org.name
-                    print("This is when user is not anonymous")
                 elif user.is_anonymous and len(helpdesk_orgs) > 1:
-                    print("greater than 1 helpdesk_orgs", helpdesk_orgs)
                     return_info['default_org'] = {'name': 'Select an Organization'}
                     return_info['orgs'] = helpdesk_orgs
 
