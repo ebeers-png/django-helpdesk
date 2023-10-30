@@ -298,7 +298,7 @@ class AttachmentFileInputWidget(forms.ClearableFileInput):
     template_name = 'helpdesk/include/attachment_input.html'
 
 
-def create_presigned_url(bucket_name, object_name, expiration=3600):
+def create_presigned_url(bucket_name, object_name, expiration=604800):
     # Generate a presigned URL for the S3 object
     s3_client = boto3.client('s3', region_name=settings.AWS_DEFAULT_REGION)
     try:

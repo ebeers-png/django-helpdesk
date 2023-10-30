@@ -69,13 +69,13 @@ def organization_info(user, request):
             return_info['url'] = '?org=' + org.name
             logo_path = ""
 
-            if "logos/" not in logo_path:
-                logo_path = str(return_info["default_org"].logo).split("s")[0]+'s'+'/'+str(return_info["default_org"].logo).split("s")[-1]
+            if "medialogos/" in str(return_info["default_org"].logo):
+                logo_path = str(return_info["default_org"].logo).split("logos")[0] + "/logos" + str(return_info["default_org"].logo).split("logos")[-1]
             else:
                 logo_path = str(return_info["default_org"].logo)
             
             if settings.USE_S3 is True:
-                return_info['org_logo'] = create_presigned_url(settings.AWS_STORAGE_BUCKET_NAME, f"{settings.MEDIA_ROOT}/{logo_path}")
+                return_info['org_logo'] = create_presigned_url(settings.AWS_STORAGE_BUCKET_NAME, logo_path)
             else:
                 return_info['org_logo'] = settings.MEDIA_ROOT + logo_path
             
