@@ -69,6 +69,8 @@ def organization_info(user, request):
             return_info['url'] = '?org=' + org.name
             logo_path = ""
 
+            print("Helpdesk logo path", return_info["default_org"].logo)
+
             if "medialogos/" in str(return_info["default_org"].logo):
                 logo_path = str(return_info["default_org"].logo).split("logos")[0] + "/logos" + str(return_info["default_org"].logo).split("logos")[-1]
             else:
