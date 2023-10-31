@@ -11,7 +11,7 @@ from django.conf import settings
 import boto3
 from botocore.exceptions import ClientError
 import logging
-import re
+import os
 from seed.lib.superperms.orgs.models import Organization, OrganizationUser, get_helpdesk_orgs_for_domain, get_helpdesk_organizations
 from helpdesk.decorators import is_helpdesk_staff
 
@@ -69,17 +69,15 @@ def organization_info(user, request):
             return_info['url'] = '?org=' + org.name
             logo_path = ""
 
-            print("Helpdesk logo path", return_info["default_org"].logo)
-
-            if "medialogos/" in str(return_info["default_org"].logo):
-                logo_path = str(return_info["default_org"].logo).split("logos")[0] + "/logos" + str(return_info["default_org"].logo).split("logos")[-1]
+            if "medialogos" in str(return_info["default_org"].logo):
+                logo_path = os.path.join(str(return_info["default_org"].logo).split("logos")[0], "logos", str(return_info["default_org"].logo).split("logos")[-1])
             else:
                 logo_path = str(return_info["default_org"].logo)
             
             if settings.USE_S3 is True:
-                return_info['org_logo'] = "logo path"
+                return_info['org_logo'] = create_presigned_url(settings.AWS_STORAGE_BUECKET_NAME, logo_path)
             else:
-                return_info['org_logo'] = settings.MEDIA_ROOT + logo_path
+                return_info['org_logo'] = os.path.join(str(return_info["default_org"].logo).split("logos")[0], str(return_info["default_org"].logo).split("logos")[-1])
             
             
         else:
