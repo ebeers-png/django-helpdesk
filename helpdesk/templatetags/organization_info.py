@@ -73,8 +73,6 @@ def organization_info(user, request):
                 logo_path = os.path.join(str(return_info["default_org"].logo).split("logos")[0], "logos", str(return_info["default_org"].logo).split("logos")[-1])
             else:
                 logo_path = str(return_info["default_org"].logo)
-
-            print("Helpdesk logo path", logo_path)
             
             if settings.USE_S3 is True:
                 return_info['org_logo'] = create_presigned_url(settings.AWS_STORAGE_BUCKET_NAME, logo_path)
