@@ -70,15 +70,18 @@ def organization_info(user, request):
             logo_path = ""
 
             if "medialogos" in str(return_info["default_org"].logo):
+                print("Found medialogos in logo path")
                 logo_path = os.path.join(str(return_info["default_org"].logo).split("logos")[0], "logos", str(return_info["default_org"].logo).split("logos")[-1])
+                print("First logo path", logo_path)
             else:
                 logo_path = str(return_info["default_org"].logo)
+                print("second logo path", logo_path)
                  
             if settings.USE_S3 is True:
                 return_info['org_logo'] = create_presigned_url(settings.AWS_STORAGE_BUCKET_NAME, logo_path)
             else:
                 return_info['org_logo'] = "/api/v3/media" + logo_path
-            print(return_info['org_logo'])
+                print(return_info['org_logo'])
                        
         else:
             helpdesk_orgs = get_helpdesk_orgs_for_domain(domain_id)
