@@ -1170,7 +1170,12 @@ class Attachment(models.Model):
         return self.file.file.size
 
     def download_attachment(self):
-        return create_presigned_url(settings.AWS_STORAGE_BUCKET_NAME, f"{self.file}")
+        url = ""
+        if settings.USE_S3 is True:
+            url = create_presigned_url(settings.AWS_STORAGE_BUCKET_NAME, f"{self.file}")
+        else:
+            url = "/api/v3/media/" + self.file
+        return url
 
     def attachment_path(self, filename):
         """Provide a file path that will help prevent files being overwritten, by
