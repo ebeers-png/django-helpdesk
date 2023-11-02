@@ -77,7 +77,7 @@ def organization_info(user, request):
             if settings.USE_S3 is True:
                 return_info['org_logo'] = create_presigned_url(settings.AWS_STORAGE_BUCKET_NAME, logo_path)
             else:
-                return_info['org_logo'] = logo_path
+                return_info['org_logo'] = "/api/v3/media" + logo_path
             print(return_info['org_logo'])
                        
         else:
