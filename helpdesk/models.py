@@ -1174,7 +1174,7 @@ class Attachment(models.Model):
         if settings.USE_S3 is True:
             url = create_presigned_url(settings.AWS_STORAGE_BUCKET_NAME, f"{self.file}")
         else:
-            url = "/api/v3/media/" + self.file
+            url = "/api/v3/media/" + str(self.file)
         return url
 
     def attachment_path(self, filename):
