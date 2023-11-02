@@ -363,7 +363,7 @@ class EditKBItemForm(forms.ModelForm):
         self.attachment_formset.initial = initial_attach
 
         for form in self.attachment_formset.forms:
-            form.fields['file'].widget.attrs.update({'url': create_presigned_url(settings.AWS_STORAGE_BUCKET_NAME, form.initial['file'].name) if settings.USE_S3 is True else form.initial['file'].name})
+            form.fields['file'].widget.attrs.update({'url': create_presigned_url(settings.AWS_STORAGE_BUCKET_NAME, form.initial['file'].name) if settings.USE_S3 is True else "/api/v3/media/"+ form.initial['file'].name})
             form.fields['file'].required = False
 
 
