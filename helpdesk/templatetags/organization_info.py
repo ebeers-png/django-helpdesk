@@ -34,14 +34,6 @@ def create_presigned_url(bucket_name, object_name, expiration=3600):
     return response
 
 
-
-# def display_logo():
-#     if settings.USE_S3 is True:
-#         return create_presigned_url(settings.AWS_STORAGE_BUCKET_NAME, f"")
-#     else:
-#         return ""
-
-
 @register.simple_tag
 def organization_info(user, request):
     """
