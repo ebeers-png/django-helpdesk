@@ -3396,7 +3396,7 @@ def get_building_data(request, ticket_id):
                         value = ''
 
                     # If the data types differ, we can't allow users to copy over the data.
-                    if f.data_type in ['varchar', 'text', 'email', 'url', 'ipaddress', 'slug', 'list']:
+                    if f.data_type in ['varchar', 'text', 'email', 'url', 'ipaddress', 'slug', 'list', 'multiselect']:
                         data_type = 'string'
                     elif f.data_type in ['date', 'datetime']:
                         data_type = 'datetime'

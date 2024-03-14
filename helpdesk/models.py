@@ -2039,6 +2039,7 @@ class CustomField(models.Model):
         ('integer', _('Integer')),
         ('decimal', _('Decimal')),
         ('list', _('List')),
+        ('multiselect', _('List (select multiple)')),
         ('boolean', _('Boolean (checkbox yes/no)')),
         ('date', _('Date')),
         ('time', _('Time')),

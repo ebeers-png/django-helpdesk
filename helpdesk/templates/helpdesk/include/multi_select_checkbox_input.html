@@ -1,0 +1,50 @@
+<div {% include "django/forms/widgets/attrs.html" %}>
+    {% if widget.min_select > 0 or widget.max_select > 0 %}
+    <p>
+        Select
+        {% if widget.min_select > 0 and widget.max_select > 0 %}
+            between {{ widget.min_select }} and {{ widget.max_select }}
+        {% elif widget.min_select > 0 %}
+            at least {{ widget.min_select }}
+        {% elif widget.max_select > 0 %}
+            at most {{ widget.max_select}}
+        {% endif%}
+        options
+    </p>
+    {% endif %}  
+
+    {% for group_name, group_choices, group_index in widget.optgroups %}
+        {% for check in group_choices %}
+            <div class="form-check">
+                <input class="form-check-input" name="{{ widget.name }}" type="checkbox" value="" id="{{ check.name }}">
+                <label class="form-check-label" for="{{ check.name }}">
+                  Default checkbox
+                </label>
+            </div>
+        {% endfor %}
+    {% endfor %}
+</div>
+
+<script>
+    {{ widget.name }}_min_select = {{ widget.min_select }}
+    {{ widget.name }}_max_select = {{ widget.max_select }}
+
+    $('[name={{ widget.name }}]').on('change', function() {
+        checkboxes = document.querySelectorAll('[name={{ widget.name }}]')
+        
+        num_selected = checkboxes.filter((check) => check.checked == true).length
+        if (num_selected >= max_selected) {
+            for (const checkbox of checkboxes) {
+                // Disable unchecked boxes to prevent additional checks
+                checkbox.disabled = !checkbox.checked 
+            }
+        } else {
+            for (const checkbox of checkboxes) {
+                // Enable all checkboxes when under limit
+                checkbox.disabled = false
+            }
+        }
+
+
+    })
+</script>

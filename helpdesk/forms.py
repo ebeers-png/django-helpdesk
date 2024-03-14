@@ -103,6 +103,11 @@ class CustomFieldMixin(object):
                 choices.insert(0, ('', '---------'))
             instanceargs['choices'] = choices
             instanceargs['widget'] = forms.Select(attrs={'class': 'form-control'})
+        elif field.data_type == 'multiselect':
+            fieldclass = forms.MultipleChoiceField
+            choices = field.choices_as_array
+            instanceargs['choices'] = choices
+            instanceargs['widget'] = MultiselectCheckboxInput() # add min / max args
         else:
             # Try to use the immediate equivalences dictionary
             try:
@@ -295,6 +300,20 @@ class EditKBCategoryForm(forms.ModelForm):
 class AttachmentFileInputWidget(forms.ClearableFileInput):
     template_name = 'helpdesk/include/attachment_input.html'
 
+
+class MultiselectCheckboxInput(forms.SelectMultiple):
+    template_name = 'helpdesk/include/multiple_select_checkbox_input.html'
+
+    def __init__(self, *args, **kwargs):
+        self.min_select = kwargs.pop('min_select', -1)
+        self.max_select = kwargs.pop('max_select', -1)
+
+    def get_context(self, name, value, attrs):
+        context = super().get_context(name, value, attrs)
+        context['min_select'] = self.min_select
+        context['min_select'] = self.max_select
+        return context
+    
 
 class EditKBItemForm(forms.ModelForm):
 
@@ -859,7 +878,7 @@ class AbstractTicketForm(CustomFieldMixin, forms.Form):
 
             for field in queryset:
                 if field.field_name in self.fields:
-                    attrs = ['label', 'help_text', 'list_values', 'required', 'data_type']
+                    attrs = ['label', 'help_text', 'list_values', 'required', 'data_type', 'multiselect']
                     for attr in attrs:
                         display_info = getattr(field, attr, None)
                         if display_info is not None and display_info != '':
@@ -869,6 +888,8 @@ class AbstractTicketForm(CustomFieldMixin, forms.Form):
                                 if display_info == 'datetime' or display_info == 'time' or display_info == 'date':
                                     self.fields[field.field_name].widget.attrs.update(
                                         {'autocomplete': 'off'})
+                            # elif attr == 'multiselect':
+                            #     self.fields[field.field_name] = 
                             else:
                                 setattr(self.fields[field.field_name], attr, display_info)
                 else:
