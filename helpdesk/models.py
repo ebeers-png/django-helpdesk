@@ -562,10 +562,16 @@ class Ticket(models.Model):
         """Return back total time spent on the ticket. This is calculated value
         based on total sum from all FollowUps
         """
+        # total = datetime.timedelta(0)
+        # for val in self.followup_set.all():
+        #     if val.time_spent:
+        #         total = total + val.time_spent
+        # return total
+
         total = datetime.timedelta(0)
-        for val in self.followup_set.all():
-            if val.time_spent:
-                total = total + val.time_spent
+        for val in self.timespent_set.all():
+            if val.get_time_spent:
+                total += val.get_time_spent
         return total
 
     @property
@@ -1014,11 +1020,6 @@ class FollowUp(models.Model):
     )
 
     objects = FollowUpManager()
-
-    time_spent = models.DurationField(
-        help_text=_("Time spent on this follow up"),
-        blank=True, null=True
-    )
 
     class Meta:
         ordering = ('date',)
