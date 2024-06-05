@@ -1045,6 +1045,39 @@ class FollowUp(models.Model):
     def time_spent_formatted(self):
         return format_time_spent(self.time_spent)
 
+class TimeSpent(models.Model):
+    user = models.ForeignKey(
+            settings.AUTH_USER_MODEL,
+            on_delete=models.SET_NULL,
+            blank=True,
+            null=True,
+            verbose_name=_('User'),
+        )
+
+    ticket = models.ForeignKey(
+        Ticket,
+        on_delete=models.CASCADE,
+        verbose_name=_('Ticket'),
+    )
+
+    start_time = models.DateTimeField()
+
+    stop_time = models.DateTimeField(blank=True, null=True)
+
+    class Meta:
+        verbose_name = _('Time Spent')
+        verbose_name_plural = _('Time Spent Entries')
+
+    @property
+    def get_time_spent(self):
+        if self.start_time and self.stop_time:
+            return self.stop_time - self.start_time
+        else:
+            return None
+    
+    @property
+    def time_spent_formatted(self):
+        return format_time_spent(self.get_time_spent)
 
 class TicketChange(models.Model):
     """
