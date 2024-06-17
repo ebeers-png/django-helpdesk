@@ -4,6 +4,7 @@
 {% load saved_queries %}
 {% with user|saved_queries as user_saved_queries_ %}
 {% with request.resolver_match.url_name as url_name %}
+{% load get_unread_notifications %}
     <!-- Sidebar -->
     <ul class="sidebar navbar-nav">
     {% if helpdesk_settings.HELPDESK_NAVIGATION_ENABLED and user.is_authenticated or user|is_helpdesk_staff %}
