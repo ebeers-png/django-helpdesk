@@ -29,6 +29,7 @@ from django.utils.html import escape
 from django.utils import timezone
 from django.utils.safestring import mark_safe
 from django.views.generic.edit import FormView, UpdateView
+from django.views.generic.list import ListView
 
 from helpdesk.forms import CUSTOMFIELD_DATE_FORMAT, CUSTOMFIELD_DATETIME_FORMAT, PreviewWidget
 from helpdesk.query import (
@@ -60,7 +61,7 @@ from helpdesk.lib import (
 from helpdesk.models import (
     Ticket, Queue, FollowUp, TimeSpent, TicketChange, PreSetReply, FollowUpAttachment, SavedSearch,
     IgnoreEmail, TicketCC, TicketDependency, UserSettings, KBItem, CustomField, is_unlisted,
-    FormType, EmailTemplate, get_markdown, clean_html, Tag
+    FormType, EmailTemplate, get_markdown, clean_html, Tag, Notification
 )
 
 from helpdesk import settings as helpdesk_settings
@@ -1408,6 +1409,49 @@ def update_ticket(request, ticket_id, public=False):
         if SHOW_SUBSCRIBE:
             subscribe_staff_member_to_ticket(ticket, request.user)
 
+    if old_owner != ticket.assigned_to:
+        message = "A ticket has been assigned to you"
+    else:
+        if request.user:
+            message = "Ticket " + str(ticket.id) + " has been updated by " + str(request.user.get_full_name())
+        else:
+            if request.user.email:
+                message = "Ticket " + str(ticket.id) + " has been updated (" + str(request.user.email) + ")"
+            else:
+                message = "Ticket " + str(ticket.id) + " has been updated"
+
+    for ticketcc in ticket.ticketcc_set.all():
+        if is_helpdesk_staff(ticketcc.user, ticket.ticket_form.organization_id) and ticketcc.user.usersettings_helpdesk.enable_notifications:
+            if request.user:
+                message = "A ticket you have been CC'd on has been updated by " + str(request.user.get_full_name())
+            else:
+                if request.user.email:
+                    message = "A ticket you have been CC'd on has been updated (" + str(request.user.email) + ")"
+                else:
+                    message = "A ticket you have been CC'd on has been updated"
+            new_notification = Notification(
+                user=ticketcc.user,
+                ticket=ticket,
+                organization=ticket.ticket_form.organization,
+                message= message,
+                is_read=False,
+                delete_by = timezone.now() + timedelta(days=60)
+            )
+
+            new_notification.save()
+
+    if ticket.assigned_to and ticket.assigned_to.usersettings_helpdesk.enable_notifications:
+        new_notification = Notification(
+            user=ticket.assigned_to,
+            ticket=ticket,
+            organization=ticket.ticket_form.organization,
+            message=message,
+            is_read=False,
+            delete_by = timezone.now() + timedelta(days=60)
+        )
+
+        new_notification.save()
+
     return return_to_ticket(request.user, request, helpdesk_settings, ticket)
 
 @helpdesk_staff_member_required
@@ -1510,6 +1554,19 @@ def mass_update(request):
                              public=False,  # DC
                              user=request.user)
                 f.save()
+
+                if user.usersettings_helpdesk.enable_notifications:
+                    new_notification = Notification(
+                        user=user,
+                        ticket=t,
+                        organization=t.ticket_form.organization,
+                        message='You\'ve been assigned to ticket ' + str(t.id),
+                        is_read=False,
+                        delete_by = timezone.now() + timedelta(days=60)
+                    )
+
+                    new_notification.save()
+            
             if user.usersettings_helpdesk.email_on_ticket_assign and user != request.user:
                 # customized context in order for the bulk template to work properly
                 # yes, queues can have different sender addresses, but it seems unnecessary to rewrite everything just for that edge case
@@ -1534,6 +1591,7 @@ def mass_update(request):
                 )
     else:
         for t in Ticket.objects.filter(id__in=tickets):
+            message = None
             if not huser.can_access_queue(t.queue):
                 continue
 
@@ -1548,6 +1606,8 @@ def mass_update(request):
                              public=False,  # DC
                              user=request.user)
                 f.save()
+
+                message = 'You\'ve been assigned to ticket ' + str(t.id)
             elif action == 'unassign' and t.assigned_to is not None:
                 t.assigned_to = None
                 t.save()
@@ -1557,6 +1617,8 @@ def mass_update(request):
                              public=False,  # DC
                              user=request.user)
                 f.save()
+
+                message = 'You\ve been unassigned from ticket ' + str(t.id)
             elif action == 'set_kbitem':
                 t.kbitem = kbitem
                 t.save()
@@ -1649,9 +1711,36 @@ def mass_update(request):
                         ticket=t
                     )
 
+                message = 'Ticket ' + str(t.id) + ' has been closed'
             elif action == 'delete':
                 # todo create a note of this somewhere?
                 t.delete()
+            
+            if message:
+                if t.assigned_to.usersettings_helpdesk.enable_notifications:
+                    new_notification = Notification(
+                        user=t.assigned_to,
+                        ticket=t,
+                        organization=t.ticket_form.organization,
+                        message=message,
+                        is_read=False,
+                        delete_by = timezone.now() + timedelta(days=60)
+                    )
+
+                    new_notification.save()
+                
+                for ticketcc in t.ticketcc_set.all():
+                    if ticketcc.user.usersettings_helpdesk.enable_notifications:
+                        new_notification = Notification(
+                            user=ticketcc.user,
+                            ticket=t,
+                            organization=t.ticket_form.organization,
+                            message='A ticket you were CC\'d on has been updated',
+                            is_read=False,
+                            delete_by = timezone.now() + timedelta(days=60)
+                        )
+
+                        new_notification.save()
 
     return JsonResponse({'update_status': "Ticket Update Complete"})
 
@@ -2160,6 +2249,32 @@ class CreateTicketView(MustBeStaffMixin, abstract_views.AbstractCreateTicketMixi
 
     def form_valid(self, form):
         self.ticket = form.save(form_id=self.form_id, user=self.request.user if self.request.user.is_authenticated else None)
+
+        for ticketcc in self.ticket.ticketcc_set.all():
+            if is_helpdesk_staff(ticketcc.user, self.ticket.ticket_form.organization_id) and ticketcc.user.usersettings_helpdesk.enable_notifications:
+                new_notification = Notification(
+                    user=ticketcc.user,
+                    ticket=self.ticket,
+                    organization=self.ticket.ticket_form.organization,
+                    message="A ticket has been created and you are CC'd on it",
+                    is_read=False,
+                    delete_by = timezone.now() + timedelta(days=60)
+                )
+
+                new_notification.save()
+
+        if self.ticket.assigned_to and self.ticket.assigned_to.usersettings_helpdesk.enable_notifications:
+            new_notification = Notification(
+                user=self.ticket.assigned_to,
+                ticket=self.ticket,
+                organization=self.ticket.ticket_form.organization,
+                message="A new ticket has been created and you have been assigned to it",
+                is_read=False,
+                delete_by = timezone.now() + timedelta(days=60)
+            )
+
+            new_notification.save()
+
         if self.request.GET.get('milestone_beam_redirect', False):
             # Pair Ticket to Milestone
             attach_ticket_to_property_milestone(self.request, self.ticket)
@@ -3766,3 +3881,89 @@ def export(qs, org, serializer, paginate=False, do_extra_data=True, visible_cols
         response['Content-Disposition'] = 'attachment; filename=' + file_name
         response['Content-Type'] = 'application/vnd.ms-excel; charset=utf-16'
         return response
+
+class CreateNotificationView(ListView):
+    model = Notification
+    template_name = 'helpdesk/notifications_index.html'
+
+    def get_queryset(self):
+        return Notification.objects.filter(user=self.request.user).order_by("-created")
+
+    def get_context_data(self, **kwargs):
+        huser = HelpdeskUser(self.request.user)
+        user_saved_queries = SavedSearch.objects.filter(user=self.request.user)
+        notifications = Notification.objects.filter(user=self.request.user, organization = self.request.user.default_organization.helpdesk_organization).order_by("-created")
+        user_saved_queries = SavedSearch.objects.filter(user=self.request.user)
+
+        # New notifications paginator
+        page = self.request.GET.get('p', '1')
+        try:
+            page = int(page)
+        except ValueError:
+            page = 1
+
+        
+        notifications_per_page = 25
+        
+        paginator = Paginator(notifications, notifications_per_page)
+        try:
+            notifications = paginator.page(page)
+        except PageNotAnInteger:
+            notifications = paginator.page(1)
+        except EmptyPage:
+            notifications = paginator.page(paginator.num_pages)
+
+        context = super().get_context_data(**kwargs)
+        context['notifications'] = notifications
+        context['user_saved_queries'] = user_saved_queries
+        context['queue_choices'] = huser.get_queues()
+        context['user_saved_queries'] = user_saved_queries
+        context['notifications_per_page'] = notifications_per_page
+        context['notification_index_start'] = paginator.page(page).start_index() 
+        context['notification_index_end'] = paginator.page(page).end_index() 
+        context['notification_total'] = paginator.count
+
+        return context
+
+def notifications_json(request):
+    
+    notifications = Notification.objects.filter(user=request.user, organization=request.user.default_organization.helpdesk_organization).order_by("-created")
+
+    data = [{
+        'id': notification.id,
+        'message': notification.message,
+        'date': notification.get_time_since_created(),
+        'ticket_title': notification.ticket.title,
+        'ticket_queue': notification.ticket.queue.title, 
+        'is_read': notification.is_read,
+        'created': notification.created
+    } for notification in notifications]
+
+    return JsonResponse({'data': data})
+
+def mark_notification_as_read(request, notification_id):
+    notification = get_object_or_404(Notification, id=notification_id, user=request.user)
+    notification.is_read = True
+    notification.save()
+
+    return redirect(notification.ticket.get_absolute_url())
+
+def mark_selected_as_read(request):
+    selected = request.POST.getlist('selected[]')
+
+    if request.method == 'POST':
+        for id in selected:
+            notification = Notification.objects.get(id=int(id), user=request.user)
+            notification.is_read = True
+            notification.save()
+        return JsonResponse({"selected": selected})
+
+def delete_selected_notifications(request):
+    selected = request.POST.getlist('selected[]')
+
+    if request.method == 'POST':
+        for id in selected:
+            notification = Notification.objects.get(id=int(id), user=request.user)
+            notification.delete()
+        return JsonResponse({"selected": selected})
+        
