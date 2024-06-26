@@ -1373,7 +1373,7 @@ def process_google_message(message, importer, queues, logger, msg_id, server):
 
     # Get subject, sender, to_list, cc_list
     for header in headers:
-        if header['name'] == 'Subject':
+        if header['name'] == 'Subject' or header['name'] == 'subject':
             subject = header['value']
             for affix in STRIPPED_SUBJECT_STRINGS:
                 subject = subject.replace(affix, "")
@@ -1397,7 +1397,7 @@ def process_google_message(message, importer, queues, logger, msg_id, server):
     # Sort out which queue this email should go into #
     ticket, queue = None, None
     for q in queues['importer_queues']:
-        matchobj = re.match(r".*\[" + q.slug + r"-(?P<id>\d+)\]", subject)
+        matchobj = re.match(r".*\[" + q.slug + r"-(?P<id>\d+)\]", subject) if subject else None
         if matchobj and not ticket:
             ticket = matchobj.group('id')
             queue = q
