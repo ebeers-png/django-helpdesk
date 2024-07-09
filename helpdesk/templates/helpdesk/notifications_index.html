@@ -80,6 +80,7 @@
     $(document).ready(function() {
         var selected = [];
         var hiddenRowsData = [];
+        var all_notification_ids = [];
         var filterContainer = $('#filterContainer');
 
         // Go to the url that marks a notification as read
@@ -156,6 +157,7 @@
 
             "initComplete": function() {
                 this.api().columns().every(function (index) {
+                    // Adds all queues to the dropdown menu.
                     if (index === 4) {
                         let column = this
 
@@ -183,6 +185,7 @@
                             });
                     
                         $('#filterQueue').text('Filter by Queue:')
+                    // Adds logic for filtering by read/unread notifications
                     } else if (index === 5) {
                         let column = this
 
@@ -231,18 +234,23 @@
 
         $("#select_all_btn").click(function () {
             $(".notification_multi_select").prop('checked', true);
+
+            for (const id of document.querySelectorAll(".notification_multi_select")) {
+                    all_notification_ids.push(id.value)
+                };
+            
             all_notification_ids.forEach(function(e) {
                 if (!selected.includes(String(e))) {
                     selected.push(String(e));
                 }
             })
             
-            
         });
 
         $("#select_none_btn").click(function () {
             $(".notification_multi_select").prop('checked', false);
             selected = [];
+            all_notification_ids = []
             
         });
     
@@ -259,7 +267,7 @@
             }
         })
         
-
+        // Deletes all selected notifications
         $("#delete_btn").click(function (e) {
             if (selected.length > 0) {
                 $.ajax({
@@ -279,7 +287,8 @@
                 location.reload();
             }
         })
-
+ 
+        // Mark all selected notifications as read
         $('#mark_as_read_btn').click(function() {
             if (selected.length > 0) {
                 $.ajax({

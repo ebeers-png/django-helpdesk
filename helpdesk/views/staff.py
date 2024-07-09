@@ -1422,6 +1422,18 @@ def update_ticket(request, ticket_id, public=False):
                 message = "Ticket " + str(ticket.id) + " has been updated (" + str(request.user.email) + ")"
             else:
                 message = "Ticket " + str(ticket.id) + " has been updated"
+    
+    if ticket.assigned_to and ticket.assigned_to.usersettings_helpdesk.enable_notifications:
+        new_notification = Notification(
+            user=ticket.assigned_to,
+            ticket=ticket,
+            organization=ticket.ticket_form.organization,
+            message=message,
+            is_read=False,
+            delete_by = timezone.now() + timedelta(days=60)
+        )
+
+        new_notification.save()
 
     for ticketcc in ticket.ticketcc_set.all():
         if is_helpdesk_staff(ticketcc.user, ticket.ticket_form.organization_id) and ticketcc.user.usersettings_helpdesk.enable_notifications:
@@ -1442,18 +1454,6 @@ def update_ticket(request, ticket_id, public=False):
             )
 
             new_notification.save()
-
-    if ticket.assigned_to and ticket.assigned_to.usersettings_helpdesk.enable_notifications:
-        new_notification = Notification(
-            user=ticket.assigned_to,
-            ticket=ticket,
-            organization=ticket.ticket_form.organization,
-            message=message,
-            is_read=False,
-            delete_by = timezone.now() + timedelta(days=60)
-        )
-
-        new_notification.save()
 
     return return_to_ticket(request.user, request, helpdesk_settings, ticket)
 
