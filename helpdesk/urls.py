@@ -447,5 +447,14 @@ urlpatterns += [
     url(r'^notifications/json/$',
         staff.notifications_json,
         name="notifications_json"),
+    
+    url(r'^create_announcement/$',
+        staff.CreateAnnouncementView.as_view(),
+        name="create_announcement"),
+    
+    url(r'^mark_announcement_as_read/(?P<notification_id>[0-9]+)/$',
+        staff.mark_announcement_as_read,
+        name="mark_announcement_as_read"),
+    
 
 ]
