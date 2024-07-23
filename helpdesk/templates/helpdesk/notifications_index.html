@@ -14,6 +14,10 @@
 {% block helpdesk_body %}
 <div class="d-flex align-items-center">    
     
+    <div class="input-group justify-content-start">
+        <a href="{% url 'helpdesk:create_announcement' %}"><button id="announcements_btn" class="btn btn-outline-primary rounded-left font-weight-semibold ml-2" type="button">Create Annoucement<i class="fa fa-plus ml-2"></i></button></a>
+    </div>
+    
     <div class="input-group justify-content-end">
 
         
@@ -33,8 +37,7 @@
 </div>
 
 <div class="row">
-    <div class="col-sm-8 col-md-9 col-lg-10 order-1 pl-3">
-
+    <div class="col-sm-8 col-md-9 col-lg-12 order-1 pt-2">
         <div id="query_card" class="card mb-2">
             <!-- Notifications-->
             <div class="card-header">

@@ -31,7 +31,7 @@ from django.utils.safestring import mark_safe
 from django.views.generic.edit import FormView, UpdateView
 from django.views.generic.list import ListView
 
-from helpdesk.forms import CUSTOMFIELD_DATE_FORMAT, CUSTOMFIELD_DATETIME_FORMAT, PreviewWidget
+from helpdesk.forms import CUSTOMFIELD_DATE_FORMAT, CUSTOMFIELD_DATETIME_FORMAT, PreviewWidget, AnnouncementForm
 from helpdesk.query import (
     get_query_class,
     query_to_base64,
@@ -2126,6 +2126,8 @@ def ticket_list(request):
     except EmptyPage:
         tickets = paginator.page(paginator.num_pages)
 
+    announcements = Notification.objects.filter(organization=org, announcement=True, is_read=False).order_by('-created')
+
     return render(request, 'helpdesk/ticket_list.html', dict(
         context,
         tickets_per_page=tickets_per_page,
@@ -2146,6 +2148,7 @@ def ticket_list(request):
         ticket_index_start=paginator.page(page).start_index(),
         ticket_index_end=paginator.page(page).end_index(),
         ticket_total=paginator.count,
+        unread_announcements=announcements
     ))
 
 ticket_list = staff_member_required(ticket_list)
@@ -3927,7 +3930,7 @@ class CreateNotificationView(ListView):
 
 def notifications_json(request):
     
-    notifications = Notification.objects.filter(user=request.user, organization=request.user.default_organization.helpdesk_organization).order_by("-created")
+    notifications = Notification.objects.filter(user=request.user, organization=request.user.default_organization.helpdesk_organization, announcement=False).order_by("-created")
 
     data = [{
         'id': notification.id,
@@ -3966,4 +3969,30 @@ def delete_selected_notifications(request):
             notification = Notification.objects.get(id=int(id), user=request.user)
             notification.delete()
         return JsonResponse({"selected": selected})
+
+def mark_announcement_as_read(request, notification_id):
+    notification = get_object_or_404(Notification, id=notification_id, user=request.user)
+    notification.is_read = True
+    notification.save()
+
+    return JsonResponse({'notification_id': notification_id}, status=status.HTTP_200_OK)
+
+
+class CreateAnnouncementView(FormView):
+    template_name = 'helpdesk/create_announcement.html'
+    form_class = AnnouncementForm
+
+    def form_valid(self, form):
+        new_announcement = form.save(commit=False)
+        new_announcement.user = self.request.user
+        new_announcement.organization = self.request.user.default_organization.helpdesk_organization
+        new_announcement.announcement = True
+        new_announcement.is_read = False
+
+        new_announcement.save()
+
+        return super().form_valid(form)
+
+    def get_success_url(self):
+        return reverse('helpdesk:list')
         
