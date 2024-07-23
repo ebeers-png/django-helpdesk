@@ -18,6 +18,7 @@
 {% endblock %}
 
 {% block announcements %}
+<!-- Random Comment -->
 {% for announcement in unread_announcements %}
 <div class="alert alert-primary alert-dismissible fade show" role="alert">
     {{announcement.message}}
