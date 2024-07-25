@@ -89,7 +89,7 @@ def format_time_spent(time_spent):
 class EscapeHtml(Extension):
     def extendMarkdown(self, md, md_globals):
         del md.preprocessors['html_block']
-        del md.inlinePatterns['html']
+        # del md.inlinePatterns['html']
 
 
 def _cleaner_set_target(domain, attrs, new=False):
@@ -145,7 +145,31 @@ def clean_html(text):
 def get_markdown(text, org, kb=False):
     if not text:
         return ""
+    
 
+    mention_pattern = re.compile(r'@\"(.*?)\"')
+    User = get_user_model()
+
+    def replace_mention_patterns(match):
+        
+        mention = str(match.group(1))
+
+        try:
+            if '@' in mention:
+                user = User.objects.get(email=mention)
+            else:
+                try:
+                    first_name, last_name = mention.split()
+                    user = User.objects.get(first_name=first_name, last_name=last_name)
+                except ValueError:
+                    return match.group(0)
+            
+            formatted_mention = f'<span style="color:blue">@{user.first_name} {user.last_name}</span>'
+
+            return formatted_mention
+        except User.DoesNotExist:
+            return match.group(0)
+    
     domain = org.domain
 
     extensions = [EscapeHtml(),
@@ -160,6 +184,9 @@ def get_markdown(text, org, kb=False):
         collapsible_attrs = {"p": ["data-target", "data-toggle", "data-parent", "role",
                                    'aria-controls', 'aria-expanded', 'aria-labelledby', 'id']}
         header_attrs = {"h1": ['id'], "h2": ['id'], "h3": ['id'], "h4": ['id'], "h5": ['id'], "h6": ['id']}
+    else:
+         text = mention_pattern.sub(replace_mention_patterns, text)
+         
 
     css_sanitizer = CSSSanitizer(allowed_css_properties=all_styles)
     cleaner = Cleaner(
@@ -171,7 +198,9 @@ def get_markdown(text, org, kb=False):
                     **header_attrs},
         css_sanitizer=css_sanitizer
     )
+
     cleaned = cleaner.clean(markdown(text, extensions=extensions))
+
     return mark_safe(cleaned)
 
 

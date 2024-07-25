@@ -1420,6 +1420,8 @@ def update_ticket(request, ticket_id, public=False):
             else:
                 message = "Ticket " + str(ticket.id) + " has been updated"
     
+    
+
     if ticket.assigned_to and ticket.assigned_to.usersettings_helpdesk.enable_notifications:
         new_notification = Notification(
             user=ticket.assigned_to,
@@ -1451,6 +1453,23 @@ def update_ticket(request, ticket_id, public=False):
             )
 
             new_notification.save()
+
+    mention_pattern = re.compile(r'@\"(.*?)\"')
+
+    for match in mention_pattern.findall(comment):
+        first_name, last_name = match.split()
+        user = User.objects.get(first_name=first_name, last_name=last_name)
+
+        new_notification = Notification(
+            user=user,
+            ticket=ticket,
+            organization=ticket.ticket_form.organization,
+            message = "You have been mentioned in ticket " + str(ticket.id),
+            is_read=False,
+            delete_by=timezone.now() + timedelta(days=60)
+        )
+
+        new_notification.save()
 
     return return_to_ticket(request.user, request, helpdesk_settings, ticket)
 
