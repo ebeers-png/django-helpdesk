@@ -42,11 +42,6 @@
                 <div class="input-group-append">
                     <button id="runActionButton" type="button" onclick="runActions()" class="btn btn-outline-secondary" disabled> Run Action <i class="fa fa-arrow-circle-right mr-1"></i></button>
                 </div>
-
-                <!-- <div class="input-group-append">
-                    <button id="mark_as_read_btn" class="btn btn-outline-primary rounded-left font-weight-semibold ml-2" type="button" method="POST"> {% csrf_token %} Mark As Read <i class="fa fa-check mr-1"></i></button>
-                    <button id="delete_btn" class="btn btn-outline-danger font-weight-semibold ml-2" type="button" method="POST"> {% csrf_token %} Delete Selected <i class="fa fa-trash-alt mr-1"></i></button>
-                </div> -->
                 
             </div>
         </form>
@@ -314,50 +309,8 @@
                 $("#runActionButton").attr("disabled", true)
             }
 
-            console.log(selected);
         })
         
-        // Deletes all selected notifications
-        $("#delete_btn").click(function (e) {
-            if (selected.length > 0) {
-                $.ajax({
-                    url: "{% url 'helpdesk:delete_selected_notifications' %}",
-                    type: 'POST',
-                    data: {
-                        csrfmiddlewaretoken: '{{ csrf_token }}',
-                        'selected[]': selected
-                    },
-                    success: function(response) {
-                        console.log(response)
-                        location.reload();
-                    }
-                });
-            } else {
-                console.log("NOTHING HERE")
-                location.reload();
-            }
-        })
- 
-        // Mark all selected notifications as read
-        $('#mark_as_read_btn').click(function() {
-            if (selected.length > 0) {
-                $.ajax({
-                    url: "{% url 'helpdesk:mark_selected_as_read' %}",
-                    type: 'POST',
-                    data: {
-                        csrfmiddlewaretoken: '{{ csrf_token }}',
-                        'selected[]': selected,
-                    },
-                    success: function(response) {
-                        console.log(response);
-                        location.reload();
-                    }
-                });
-            } else {
-                console.log("NOTHING HERE");
-                location.reload();
-            }
-        })
     });
 
     function runActions() {
@@ -370,7 +323,6 @@
                 'action': document.getElementById('tableActions').value
             },
             success: function(response) {
-                console.log(response);
                 location.reload();
             }
         })

@@ -449,14 +449,6 @@ urlpatterns += [
     url(r'^notifications/(?P<notification_id>[0-9]+)/$',
         staff.mark_notification_as_read,
         name="mark_notification_as_read"),
-
-    url(r'^notifications/delete_notifications/$',
-        staff.delete_selected_notifications,
-        name="delete_selected_notifications"),
-
-    url(r'^notifications/mark_as_read/$',
-        staff.mark_selected_as_read,
-        name="mark_selected_as_read"),
     
     url(r'^notifications/json/$',
         staff.notifications_json,

@@ -3983,25 +3983,6 @@ def mark_notification_as_read(request, notification_id):
 
     return redirect(notification.ticket.get_absolute_url())
 
-def mark_selected_as_read(request):
-    selected = request.POST.getlist('selected[]')
-
-    if request.method == 'POST':
-        for id in selected:
-            notification = Notification.objects.get(id=int(id), user=request.user)
-            notification.is_read = True
-            notification.save()
-        return JsonResponse({"selected": selected})
-
-def delete_selected_notifications(request):
-    selected = request.POST.getlist('selected[]')
-
-    if request.method == 'POST':
-        for id in selected:
-            notification = Notification.objects.get(id=int(id), user=request.user)
-            notification.delete()
-        return JsonResponse({"selected": selected})
-
 def mark_announcement_as_read(request, notification_id):
     notification = get_object_or_404(Notification, id=notification_id, user=request.user)
     notification.is_read = True
