@@ -470,5 +470,9 @@ urlpatterns += [
         staff.mark_announcement_as_read,
         name="mark_announcement_as_read"),
     
+     url(r'^run_actions/$',
+        staff.run_actions,
+        name="run_actions"),
+    
 
 ]

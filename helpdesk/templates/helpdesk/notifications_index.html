@@ -16,15 +16,6 @@
     
     <div class="input-group justify-content-start">
         <a href="{% url 'helpdesk:create_announcement' %}"><button id="announcements_btn" class="btn btn-outline-primary rounded-left font-weight-semibold ml-2" type="button">Create Annoucement<i class="fa fa-plus ml-2"></i></button></a>
-    </div>
-    
-    <div class="input-group justify-content-end">
-
-        
-        <div class="input-group-append">
-            <button id="mark_as_read_btn" class="btn btn-outline-primary rounded-left font-weight-semibold ml-2" type="button" method="POST"> {% csrf_token %} Mark As Read <i class="fa fa-check mr-1"></i></button>
-            <button id="delete_btn" class="btn btn-outline-danger font-weight-semibold ml-2" type="button" method="POST"> {% csrf_token %} Delete Selected <i class="fa fa-trash-alt mr-1"></i></button>
-        </div>
         <div class="input-group-prepend">
             <label class="input-group-text bg-white border-0">Select:</label>
         </div>
@@ -34,6 +25,33 @@
             <button id="select_none_btn" class="btn btn-outline-danger font-weight-semibold" type="button">None <i class="fa fa-times-circle mr-1"></i></button>
         </div>
     </div>
+    
+    <div class="d-flex align-items-center mr-2" style="width: 500px">
+        <form method="post" action="{% url 'helpdesk:run_actions' %}" id="notification_run_actions">
+            {% csrf_token %} 
+            <div class="input-group">
+                <div class="input-group-prepend">
+                    <label class="input-group-text bg-white border-0">Action:</label>
+                </div>
+                <select class="custom-select rounded-left" name="action" id="tableActions" disabled>
+                    <option selected>Choose...</option>
+                    <option value="mark-read">Mark As Read</option>
+                    <option value="mark-unread">Mark As Unread</option>
+                    <option value="delete">Delete Selected</option>
+                </select>
+                <div class="input-group-append">
+                    <button id="runActionButton" type="button" onclick="runActions()" class="btn btn-outline-secondary" disabled> Run Action <i class="fa fa-arrow-circle-right mr-1"></i></button>
+                </div>
+
+                <!-- <div class="input-group-append">
+                    <button id="mark_as_read_btn" class="btn btn-outline-primary rounded-left font-weight-semibold ml-2" type="button" method="POST"> {% csrf_token %} Mark As Read <i class="fa fa-check mr-1"></i></button>
+                    <button id="delete_btn" class="btn btn-outline-danger font-weight-semibold ml-2" type="button" method="POST"> {% csrf_token %} Delete Selected <i class="fa fa-trash-alt mr-1"></i></button>
+                </div> -->
+                
+            </div>
+        </form>
+    </div>
+    
 </div>
 
 <div class="row">
@@ -55,10 +73,10 @@
                         <thead class="thead-light">
                             <tr id="headers">
                                 <th class="filter-top" data-colname="checkbox" scope="col"></th>
+                                <th class="filter-top" data-colname="queue" scope="col">Queue</th>
+                                <th class="filter-top" data-colname="ticket_link" scope="col">Ticket</th>
                                 <th class="filter-top" data-colname="message" scope="col">Message</th>
                                 <th class="filter-top" data-colname="date" scope="col">Date</th>
-                                <th class="filter-top" data-colname="ticket_link" scope="col">Ticket</th>
-                                <th></th>
                                 <th></th>
                                 
                             </tr>
@@ -78,13 +96,16 @@
 <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
 <script src="https://cdn.datatables.net/1.10.21/js/jquery.dataTables.min.js"></script>
 <script src="https://cdn.datatables.net/1.10.21/js/dataTables.bootstrap4.min.js"></script>
+<script src="//cdn.datatables.net/plug-ins/2.1.2/dataRender/ellipsis.js"></script>
 
 <script>
+    var selected = [];
+    var hiddenRowsData = [];
+    var all_notification_ids = [];
+    var filterContainer = $('#filterContainer');
+
     $(document).ready(function() {
-        var selected = [];
-        var hiddenRowsData = [];
-        var all_notification_ids = [];
-        var filterContainer = $('#filterContainer');
+
 
         // Go to the url that marks a notification as read
         var baseUrl = "{% url 'helpdesk:mark_notification_as_read' 0%}"
@@ -105,7 +126,12 @@
 
                 {
                     "visible": false,
-                    "targets": [4,5]
+                    "targets": [5]
+                },
+
+                {
+                    "targets": [3],
+                    "render": $.fn.dataTable.render.ellipsis(85)  // Apply ellipsis render
                 }
 		    ],
             // Setting the data for all of the columns
@@ -121,8 +147,21 @@
                                 </div>`;
                     }
                 },
+
+                {"data": "ticket_queue"},
+
+                // Displays queue and title of ticket. Marks notification as read if link is clicked
+                {
+                    "data": null,
+                    "render": function(data, type, row) {
+                        var baseUrl = "{% url 'helpdesk:mark_notification_as_read' 0 %}".replace('0', row.id);
+                        return `<a href="${baseUrl}">${row.ticket_id}. ${$.fn.dataTable.render.ellipsis(40, true)(row.ticket_title, type, row)}</a>`;
+                    }
+                },
                 // Displays message
-                {"data": "message"}, 
+                {
+                    "data": "message",
+                }, 
                 // Displays the date
                 {
                     "data": "date", 
@@ -135,16 +174,6 @@
                         return `<span title = "${originalDate}">${formattedDate}</span>`;
                     }
                 },
-                // Displays queue and title of ticket. Marks notification as read if link is clicked
-                {
-                    "data": null,
-                    "render": function(data, type, row) {
-                        var baseUrl = "{% url 'helpdesk:mark_notification_as_read' 0 %}".replace('0', row.id);
-                        return `<a href= ${baseUrl}>[queue-${row.ticket_queue}] ${row.ticket_title}</a>`;
-                    }
-                },
-
-                {"data": "ticket_queue"},
                 {"data": "is_read"}
 
             ], 
@@ -154,14 +183,15 @@
             // Sets color of read notifications to gray
             "createdRow": function(row, data, dataIndex) {
                 if (data.is_read) {
-                    $(row).css('background-color', 'lightgray');
+                    $(row).addClass("bg-light")
+                    $(row).addClass("text-muted")
                 } 
             },
 
             "initComplete": function() {
                 this.api().columns().every(function (index) {
                     // Adds all queues to the dropdown menu.
-                    if (index === 4) {
+                    if (index === 1) {
                         let column = this
 
                         let select = document.createElement('select');
@@ -247,6 +277,9 @@
                     selected.push(String(e));
                 }
             })
+
+            $("#tableActions").attr("disabled", false)
+            $("#runActionButton").attr("disabled", false)
             
         });
 
@@ -254,6 +287,9 @@
             $(".notification_multi_select").prop('checked', false);
             selected = [];
             all_notification_ids = []
+
+            $("#tableActions").attr("disabled", true)
+            $("#runActionButton").attr("disabled", true)
             
         });
     
@@ -268,6 +304,17 @@
                     selected.pop($(this).val())
                 } 
             }
+
+            // Setting Action options and button to disabled if no table elements are selected
+            if (selected.length > 0) {
+                $("#tableActions").attr("disabled", false)
+                $("#runActionButton").attr("disabled", false)
+            } else {
+                $("#tableActions").attr("disabled", true)
+                $("#runActionButton").attr("disabled", true)
+            }
+
+            console.log(selected);
         })
         
         // Deletes all selected notifications
@@ -299,7 +346,7 @@
                     type: 'POST',
                     data: {
                         csrfmiddlewaretoken: '{{ csrf_token }}',
-                        'selected[]': selected
+                        'selected[]': selected,
                     },
                     success: function(response) {
                         console.log(response);
@@ -311,8 +358,24 @@
                 location.reload();
             }
         })
-
     });
+
+    function runActions() {
+        $.ajax({
+            url: "{% url 'helpdesk:run_actions' %}",
+            type: 'POST',
+            data: { 
+                csrfmiddlewaretoken: '{{ csrf_token }}',
+                'selected[]': selected,
+                'action': document.getElementById('tableActions').value
+            },
+            success: function(response) {
+                console.log(response);
+                location.reload();
+            }
+        })
+    }
+    
 </script>
 
 {% endblock %}

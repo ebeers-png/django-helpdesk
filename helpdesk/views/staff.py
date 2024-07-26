@@ -1409,18 +1409,30 @@ def update_ticket(request, ticket_id, public=False):
         if SHOW_SUBSCRIBE:
             subscribe_staff_member_to_ticket(ticket, request.user)
 
-    if old_owner != ticket.assigned_to:
+    if reassigned:
         message = "A ticket has been assigned to you"
     else:
-        if request.user:
-            message = "Ticket " + str(ticket.id) + " has been updated by " + str(request.user.get_full_name())
+        if request.user and request.user.is_authenticated and hasattr(request.user, 'usersettings_helpdesk'):
+            if new_status != old_status:
+                if len(comment) > 0:
+                    message = f"{request.user.get_full_name()} changed status to <strong>{ticket.get_status_display()}</strong> and replied \"{comment}\""
+                else:
+                    message = f"{request.user.get_full_name()} changed status to <strong>{ticket.get_status_display()}</strong>"
+            else:
+                message = str(request.user.get_full_name) + " replied \"" + str(comment) + "\""
         else:
             if request.user.email:
-                message = "Ticket " + str(ticket.id) + " has been updated (" + str(request.user.email) + ")"
+                if new_status != old_status:
+                    if len(comment) > 0:
+                        message = f"{request.user.email} changed status to <strong>{ticket.get_status_display()}</strong> and replied \"{comment}\""
+                    else:
+                        message = f"{request.user.email} changed status to <strong>{ticket.get_status_display()}</strong>"
+                else:
+                    message = str(request.user.email) + " replied \"" + str(comment) + "\""
             else:
                 message = "Ticket " + str(ticket.id) + " has been updated"
     
-    if ticket.assigned_to and ticket.assigned_to.usersettings_helpdesk.enable_notifications:
+    if ticket.assigned_to and ticket.assigned_to.usersettings_helpdesk.enable_notifications and request.user != ticket.assigned_to:
         new_notification = Notification(
             user=ticket.assigned_to,
             ticket=ticket,
@@ -1433,12 +1445,24 @@ def update_ticket(request, ticket_id, public=False):
         new_notification.save()
 
     for ticketcc in ticket.ticketcc_set.all():
-        if is_helpdesk_staff(ticketcc.user, ticket.ticket_form.organization_id) and ticketcc.user.usersettings_helpdesk.enable_notifications:
-            if request.user:
-                message = "A ticket you have been CC'd on has been updated by " + str(request.user.get_full_name())
+        if is_helpdesk_staff(ticketcc.user, ticket.ticket_form.organization_id) and ticketcc.user.usersettings_helpdesk.enable_notifications and request.user != ticketcc.user:
+            if request.user and request.user.is_authenticated and hasattr(request.user, 'usersettings_helpdesk'):
+                if new_status != old_status:
+                    if len(comment) > 0:
+                        message = f"{request.user.get_full_name()} changed status to <strong>{ticket.get_status_display()}</strong> and replied \"{comment}\""
+                    else:
+                        message = f"{request.user.get_full_name()} changed status to <strong>{ticket.get_status_display()}</strong>"
+                else:
+                    message = str(request.user.get_full_name) + " replied \"" + str(comment) + "\""
             else:
                 if request.user.email:
-                    message = "A ticket you have been CC'd on has been updated (" + str(request.user.email) + ")"
+                    if new_status != old_status:
+                        if len(comment) > 0:
+                            message = f"{request.user.email} changed status to <strong>{ticket.get_status_display()}</strong> and replied \"{comment}\""
+                        else:
+                            message = f"{request.user.email} changed status to <strong>{ticket.get_status_display()}</strong>"
+                    else:
+                        message = str(request.user.email) + " replied \"" + str(comment) + "\""
                 else:
                     message = "A ticket you have been CC'd on has been updated"
             new_notification = Notification(
@@ -1555,12 +1579,12 @@ def mass_update(request):
                              user=request.user)
                 f.save()
 
-                if user.usersettings_helpdesk.enable_notifications:
+                if user.usersettings_helpdesk.enable_notifications and t.assigned_to != request.user:
                     new_notification = Notification(
                         user=user,
                         ticket=t,
                         organization=t.ticket_form.organization,
-                        message='You\'ve been assigned to ticket ' + str(t.id),
+                        message='You\'ve been assigned to ticket ' + str(t.id) + " by " + str(request.user.get_full_name()),
                         is_read=False,
                         delete_by = timezone.now() + timedelta(days=60)
                     )
@@ -1607,7 +1631,8 @@ def mass_update(request):
                              user=request.user)
                 f.save()
 
-                message = 'You\'ve been assigned to ticket ' + str(t.id)
+                if user.usersettings_helpdesk.enable_notifications and t.assigned_to != request.user:
+                    message = f"{request.user.get_full_name()} assigned you to ticket {t.id}"
             elif action == 'unassign' and t.assigned_to is not None:
                 t.assigned_to = None
                 t.save()
@@ -1618,7 +1643,8 @@ def mass_update(request):
                              user=request.user)
                 f.save()
 
-                message = 'You\ve been unassigned from ticket ' + str(t.id)
+                if user.usersettings_helpdesk.enable_notifications and t.assigned_to != request.user:
+                    message = f"{request.user.get_full_name()} unassinged you from ticket {t.id}"
             elif action == 'set_kbitem':
                 t.kbitem = kbitem
                 t.save()
@@ -1646,6 +1672,8 @@ def mass_update(request):
                     t.assigned_to = new_user
                     f.save()
                     t.save()
+                if user.usersettings_helpdesk.enable_notifications and t.assigned_to != request.user:
+                    message = f"{request.user.get_full_name()} changed status to <strong>Closed</strong> in mass update"
             elif action == 'close_public' and t.status != Ticket.CLOSED_STATUS:
                 t.status = Ticket.CLOSED_STATUS
                 t.save()
@@ -1711,11 +1739,14 @@ def mass_update(request):
                         ticket=t
                     )
 
-                message = 'Ticket ' + str(t.id) + ' has been closed'
+                if user.usersettings_helpdesk.enable_notifications and t.assigned_to != request.user:
+                    message = f"{request.user.get_full_name()} changed status to <strong>Closed</strong> in mass update"
             elif action == 'delete':
                 # todo create a note of this somewhere?
                 t.delete()
-            
+                if user.usersettings_helpdesk.enable_notifications and t.assigned_to != request.user:
+                    message = f"{request.user.get_full_name()} deleted ticket {t.id}"
+
             if message:
                 if t.assigned_to.usersettings_helpdesk.enable_notifications:
                     new_notification = Notification(
@@ -3937,7 +3968,8 @@ def notifications_json(request):
         'message': notification.message,
         'date': notification.get_time_since_created(),
         'ticket_title': notification.ticket.title,
-        'ticket_queue': notification.ticket.queue.title, 
+        'ticket_id': notification.ticket.id,
+        'ticket_queue': notification.ticket.queue.slug, 
         'is_read': notification.is_read,
         'created': notification.created
     } for notification in notifications]
@@ -3977,6 +4009,29 @@ def mark_announcement_as_read(request, notification_id):
 
     return JsonResponse({'notification_id': notification_id}, status=status.HTTP_200_OK)
 
+def run_actions(request):
+    selected = request.POST.getlist('selected[]')
+
+    if request.method == 'POST':
+        action = request.POST.get('action', None)
+
+        if action == 'mark-read':
+            for id in selected:
+                notification = Notification.objects.get(id=int(id), user=request.user)
+                notification.is_read = True
+                notification.save()
+        elif action == 'mark-unread':
+            for id in selected:
+                notification = Notification.objects.get(id=int(id), user=request.user)
+                notification.is_read = False
+                notification.save()
+        elif action == 'delete':
+            for id in selected:
+                notification = Notification.objects.get(id=int(id), user=request.user)
+                notification.delete()
+
+    
+    return JsonResponse({'action': action}, status=status.HTTP_200_OK)
 
 class CreateAnnouncementView(FormView):
     template_name = 'helpdesk/create_announcement.html'
