@@ -18,15 +18,11 @@
 {% endblock %}
 
 {% block announcements %}
-<!-- Random Comment -->
 {% for announcement in unread_announcements %}
 <div class="alert alert-primary alert-dismissible fade show" role="alert">
     {{announcement.message}}
-    <button type="button" class="close checkmarkbutton" data-id="{{announcement.id}}" data-dismiss="alert" aria-label="Close" title= "Mark as read" style="margin-right: 30px;" data-action="mark-read">
+    <button type="button" class="close checkmarkbutton" data-id="{{announcement.id}}" data-dismiss="alert" aria-label="Close" title= "Mark as read" data-action="mark-read">
         <span aria-hidden="true"><i class="fas fa-check">{% csrf_token %}</i></span>
-    </button>
-    <button type="button" class="close" data-dismiss="alert" aria-label="Close" title="Close announcement">
-      <span aria-hidden="true"><i class="fas fa-times"></i></span>
     </button>
   </div>
 {% endfor %}

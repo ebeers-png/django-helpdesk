@@ -1361,8 +1361,8 @@ class AnnouncementForm(forms.ModelForm):
         model = Notification
         exclude = ['user', 'ticket', 'organization', 'is_read', 'created', 'announcement']
         widgets = {
-            'message': PreviewWidget,
-            'delete_by': forms.DateInput(attrs={'id': 'datefield', 'class': 'form-control', 'type': 'date', 'style': 'width: 25%'})
+            'message': forms.Textarea(attrs={'class': 'form-control'}),
+            'delete_by': forms.DateInput(attrs={'id': 'datefield', 'class': 'form-control', 'type': 'datetime-local', 'style': 'width: 25%'})
         }
         help_texts = {
             'message': 'Message to be displayed'

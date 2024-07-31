@@ -734,6 +734,8 @@ def dashboard(request):
         unassigned_tickets = paginator.page(
             paginator.num_pages)
 
+    announcements = Notification.objects.filter(organization=request.user.default_organization.helpdesk_organization, announcement=True, is_read=False).order_by('-created')
+
     return render(request, 'helpdesk/dashboard.html', {
         'user_tickets': tickets,
         'user_tickets_closed_resolved': tickets_closed_resolved,
@@ -741,6 +743,7 @@ def dashboard(request):
         'kbitems': kbitems,
         'all_tickets_reported_by_current_user': all_tickets_reported_by_current_user,
         'basic_ticket_stats': basic_ticket_stats,
+        'unread_announcements': announcements,
         'debug': settings.DEBUG,
     })
 
@@ -1421,7 +1424,7 @@ def update_ticket(request, ticket_id, public=False):
             else:
                 message = str(request.user.get_full_name) + " replied \"" + str(comment) + "\""
         else:
-            if request.user.email:
+            try:
                 if new_status != old_status:
                     if len(comment) > 0:
                         message = f"{request.user.email} changed status to <strong>{ticket.get_status_display()}</strong> and replied \"{comment}\""
@@ -1429,9 +1432,8 @@ def update_ticket(request, ticket_id, public=False):
                         message = f"{request.user.email} changed status to <strong>{ticket.get_status_display()}</strong>"
                 else:
                     message = str(request.user.email) + " replied \"" + str(comment) + "\""
-            else:
-                message = "Ticket " + str(ticket.id) + " has been updated"
-    
+            except AttributeError:
+                message = "An anonymous user replied \"" + str(comment) + "\""    
     if ticket.assigned_to and ticket.assigned_to.usersettings_helpdesk.enable_notifications and request.user != ticket.assigned_to:
         new_notification = Notification(
             user=ticket.assigned_to,
@@ -1455,7 +1457,7 @@ def update_ticket(request, ticket_id, public=False):
                 else:
                     message = str(request.user.get_full_name) + " replied \"" + str(comment) + "\""
             else:
-                if request.user.email:
+                try:
                     if new_status != old_status:
                         if len(comment) > 0:
                             message = f"{request.user.email} changed status to <strong>{ticket.get_status_display()}</strong> and replied \"{comment}\""
@@ -1463,8 +1465,8 @@ def update_ticket(request, ticket_id, public=False):
                             message = f"{request.user.email} changed status to <strong>{ticket.get_status_display()}</strong>"
                     else:
                         message = str(request.user.email) + " replied \"" + str(comment) + "\""
-                else:
-                    message = "A ticket you have been CC'd on has been updated"
+                except AttributeError:
+                    message = "An anonymous user replied \"" + str(comment) + "\""   
             new_notification = Notification(
                 user=ticketcc.user,
                 ticket=ticket,
@@ -3961,15 +3963,15 @@ class CreateNotificationView(ListView):
 
 def notifications_json(request):
     
-    notifications = Notification.objects.filter(user=request.user, organization=request.user.default_organization.helpdesk_organization, announcement=False).order_by("-created")
+    notifications = Notification.objects.filter(user=request.user, organization=request.user.default_organization.helpdesk_organization).order_by("-created")
 
     data = [{
         'id': notification.id,
         'message': notification.message,
         'date': notification.get_time_since_created(),
-        'ticket_title': notification.ticket.title,
-        'ticket_id': notification.ticket.id,
-        'ticket_queue': notification.ticket.queue.slug, 
+        'ticket_title': notification.ticket.title if notification.ticket else None,
+        'ticket_id': notification.ticket.id if notification.ticket else None,
+        'ticket_queue': notification.ticket.queue.slug if notification.ticket else None, 
         'is_read': notification.is_read,
         'created': notification.created
     } for notification in notifications]
