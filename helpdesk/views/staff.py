@@ -1422,7 +1422,7 @@ def update_ticket(request, ticket_id, public=False):
                 else:
                     message = f"{request.user.get_full_name()} changed status to <strong>{ticket.get_status_display()}</strong>"
             else:
-                message = str(request.user.get_full_name) + " replied \"" + str(comment) + "\""
+                message = f"{request.user.get_full_name()} replied \"{comment}\""
         else:
             try:
                 if new_status != old_status:
@@ -1431,7 +1431,7 @@ def update_ticket(request, ticket_id, public=False):
                     else:
                         message = f"{request.user.email} changed status to <strong>{ticket.get_status_display()}</strong>"
                 else:
-                    message = str(request.user.email) + " replied \"" + str(comment) + "\""
+                    message = f"{request.user.email} replied \"{comment}\""
             except AttributeError:
                 message = "An anonymous user replied \"" + str(comment) + "\""    
     if ticket.assigned_to and ticket.assigned_to.usersettings_helpdesk.enable_notifications and request.user != ticket.assigned_to:

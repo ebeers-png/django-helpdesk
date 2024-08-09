@@ -149,8 +149,12 @@
                 {
                     "data": null,
                     "render": function(data, type, row) {
-                        var baseUrl = "{% url 'helpdesk:mark_notification_as_read' 0 %}".replace('0', row.id);
-                        return `<a href="${baseUrl}">${row.ticket_id}. ${$.fn.dataTable.render.ellipsis(40, true)(row.ticket_title, type, row)}</a>`;
+                        if (row.ticket_id === null) {
+                            return '';
+                        } else {
+                            var baseUrl = "{% url 'helpdesk:mark_notification_as_read' 0 %}".replace('0', row.id);
+                            return `<a href="${baseUrl}">${row.ticket_id}. ${$.fn.dataTable.render.ellipsis(40, true)(row.ticket_title, type, row)}</a>`;
+                        }
                     }
                 },
                 // Displays message
