@@ -1222,6 +1222,40 @@ def update_ticket(request, ticket_id, public=False):
     if request.FILES:
         files = process_attachments(f, request.FILES.getlist('attachment'))
 
+        if request.user and request.user.is_authenticated and hasattr(request.user, 'usersettings_helpdesk'):
+            message = f"{request.user.get_full_name()} has attached a file to ticket {ticket.id}"
+        else:
+            try:
+                message = f"{request.user.email} has attached a file to ticket {ticket.id}"
+            except AttributeError:
+                message = f"An anonymous user has attached a file to ticket {ticket.id}"
+        if ticket.assigned_to and ticket.assigned_to.usersettings_helpdesk.enable_notifications and request.user != ticket.assigned_to:
+            new_notification = Notification(
+                user=ticket.assigned_to,
+                ticket=ticket,
+                organization=ticket.ticket_form.organization,
+                message=message,
+                is_read=False,
+                delete_by = timezone.now() + timedelta(days=60)
+            )
+
+            new_notification.save()
+        
+        for ticketcc in ticket.ticketcc_set.all():
+            if is_helpdesk_staff(ticketcc.user, ticket.ticket_form.organization_id) and ticketcc.user.usersettings_helpdesk.enable_notifications and request.user != ticketcc.user:
+                new_notification = Notification(
+                    user=ticketcc.user,
+                    ticket=ticket,
+                    organization=ticket.ticket_form.organization,
+                    message=message,
+                    is_read=False,
+                    delete_by = timezone.now() + timedelta(days=60)
+                )
+
+                new_notification.save()
+        
+        message = ""
+
     if title and title != ticket.title:
         c = TicketChange(
             followup=f,
@@ -1231,6 +1265,41 @@ def update_ticket(request, ticket_id, public=False):
         )
         c.save()
         ticket.title = title
+
+        if request.user and request.user.is_authenticated and hasattr(request.user, 'usersettings_helpdesk'):
+            message = f"{request.user.get_full_name()} has changed the title of ticket {ticket.id}"
+        else:
+            try:
+                message = f"{request.user.email} has changed the title of ticket {ticket.id}"
+            except AttributeError:
+                message = f"An anonymous user has changed the title of ticket {ticket.id}"
+        if ticket.assigned_to and ticket.assigned_to.usersettings_helpdesk.enable_notifications and request.user != ticket.assigned_to:
+            new_notification = Notification(
+                user=ticket.assigned_to,
+                ticket=ticket,
+                organization=ticket.ticket_form.organization,
+                message=message,
+                is_read=False,
+                delete_by = timezone.now() + timedelta(days=60)
+            )
+
+            new_notification.save()
+        
+        for ticketcc in ticket.ticketcc_set.all():
+            if is_helpdesk_staff(ticketcc.user, ticket.ticket_form.organization_id) and ticketcc.user.usersettings_helpdesk.enable_notifications and request.user != ticketcc.user:
+                new_notification = Notification(
+                    user=ticketcc.user,
+                    ticket=ticket,
+                    organization=ticket.ticket_form.organization,
+                    message=message,
+                    is_read=False,
+                    delete_by = timezone.now() + timedelta(days=60)
+                )
+
+                new_notification.save()
+        
+        message = ""
+
 
     if new_status != old_status:
         c = TicketChange(
@@ -1264,6 +1333,41 @@ def update_ticket(request, ticket_id, public=False):
         )
         c.save()
         ticket.priority = priority
+
+        if request.user and request.user.is_authenticated and hasattr(request.user, 'usersettings_helpdesk'):
+            message = f"{request.user.get_full_name()} has changed the priority of ticket {ticket.id} to <strong> {ticket.get_priority_display().split()[1]} </strong>"
+        else:
+            try:
+                message = f"{request.user.email} has changed the priority of ticket {ticket.id} to <strong> {ticket.get_priority_display().split()[1]} </strong>"
+            except AttributeError:
+                message = f"An anonymous user has changed the priority of ticket {ticket.id} to <strong> {ticket.get_priority_display().split()[1]} </strong>"
+        
+        if ticket.assigned_to and ticket.assigned_to.usersettings_helpdesk.enable_notifications and request.user != ticket.assigned_to:
+            new_notification = Notification(
+                user=ticket.assigned_to,
+                ticket=ticket,
+                organization=ticket.ticket_form.organization,
+                message=message,
+                is_read=False,
+                delete_by = timezone.now() + timedelta(days=60)
+            )
+
+            new_notification.save()
+        
+        for ticketcc in ticket.ticketcc_set.all():
+            if is_helpdesk_staff(ticketcc.user, ticket.ticket_form.organization_id) and ticketcc.user.usersettings_helpdesk.enable_notifications and request.user != ticketcc.user:
+                new_notification = Notification(
+                    user=ticketcc.user,
+                    ticket=ticket,
+                    organization=ticket.ticket_form.organization,
+                    message=message,
+                    is_read=False,
+                    delete_by = timezone.now() + timedelta(days=60)
+                )
+
+                new_notification.save()
+        
+        message = ""
 
     if due_date != ticket.due_date:
         old_value = ticket.due_date.astimezone(timezone.get_current_timezone()).strftime(CUSTOMFIELD_DATETIME_FORMAT) if ticket.due_date else 'None'
@@ -1413,7 +1517,7 @@ def update_ticket(request, ticket_id, public=False):
             subscribe_staff_member_to_ticket(ticket, request.user)
 
     if reassigned:
-        message = "A ticket has been assigned to you"
+        message = f"You have been assigned to ticket {ticket.id} by {request.user.get_full_name()}"
     else:
         if request.user and request.user.is_authenticated and hasattr(request.user, 'usersettings_helpdesk'):
             if new_status != old_status:
@@ -1422,7 +1526,8 @@ def update_ticket(request, ticket_id, public=False):
                 else:
                     message = f"{request.user.get_full_name()} changed status to <strong>{ticket.get_status_display()}</strong>"
             else:
-                message = f"{request.user.get_full_name()} replied \"{comment}\""
+                if len(comment) > 0:
+                    message = f"{request.user.get_full_name()} replied \"{comment}\""
         else:
             try:
                 if new_status != old_status:
@@ -1431,52 +1536,40 @@ def update_ticket(request, ticket_id, public=False):
                     else:
                         message = f"{request.user.email} changed status to <strong>{ticket.get_status_display()}</strong>"
                 else:
-                    message = f"{request.user.email} replied \"{comment}\""
-            except AttributeError:
-                message = "An anonymous user replied \"" + str(comment) + "\""    
-    if ticket.assigned_to and ticket.assigned_to.usersettings_helpdesk.enable_notifications and request.user != ticket.assigned_to:
-        new_notification = Notification(
-            user=ticket.assigned_to,
-            ticket=ticket,
-            organization=ticket.ticket_form.organization,
-            message=message,
-            is_read=False,
-            delete_by = timezone.now() + timedelta(days=60)
-        )
-
-        new_notification.save()
-
-    for ticketcc in ticket.ticketcc_set.all():
-        if is_helpdesk_staff(ticketcc.user, ticket.ticket_form.organization_id) and ticketcc.user.usersettings_helpdesk.enable_notifications and request.user != ticketcc.user:
-            if request.user and request.user.is_authenticated and hasattr(request.user, 'usersettings_helpdesk'):
-                if new_status != old_status:
                     if len(comment) > 0:
-                        message = f"{request.user.get_full_name()} changed status to <strong>{ticket.get_status_display()}</strong> and replied \"{comment}\""
-                    else:
-                        message = f"{request.user.get_full_name()} changed status to <strong>{ticket.get_status_display()}</strong>"
-                else:
-                    message = str(request.user.get_full_name) + " replied \"" + str(comment) + "\""
-            else:
-                try:
-                    if new_status != old_status:
-                        if len(comment) > 0:
-                            message = f"{request.user.email} changed status to <strong>{ticket.get_status_display()}</strong> and replied \"{comment}\""
-                        else:
-                            message = f"{request.user.email} changed status to <strong>{ticket.get_status_display()}</strong>"
-                    else:
-                        message = str(request.user.email) + " replied \"" + str(comment) + "\""
-                except AttributeError:
-                    message = "An anonymous user replied \"" + str(comment) + "\""   
-            new_notification = Notification(
-                user=ticketcc.user,
-                ticket=ticket,
-                organization=ticket.ticket_form.organization,
-                message= message,
-                is_read=False,
-                delete_by = timezone.now() + timedelta(days=60)
-            )
+                        message = f"{request.user.email} replied \"{comment}\""
+            except AttributeError:
+                if len(comment) > 0:
+                    message = "An anonymous user replied \"" + str(comment) + "\""    
+    if len(message) > 0:
+        if ticket.assigned_to and ticket.assigned_to.usersettings_helpdesk.enable_notifications and request.user != ticket.assigned_to:
+            if len(message) > 0:
+                new_notification = Notification(
+                    user=ticket.assigned_to,
+                    ticket=ticket,
+                    organization=ticket.ticket_form.organization,
+                    message=message,
+                    is_read=False,
+                    delete_by = timezone.now() + timedelta(days=60)
+                )
 
-            new_notification.save()
+                new_notification.save()
+
+        for ticketcc in ticket.ticketcc_set.all():
+            if is_helpdesk_staff(ticketcc.user, ticket.ticket_form.organization_id) and ticketcc.user.usersettings_helpdesk.enable_notifications and request.user != ticketcc.user:
+
+                new_notification = Notification(
+                    user=ticketcc.user,
+                    ticket=ticket,
+                    organization=ticket.ticket_form.organization,
+                    message= message,
+                    is_read=False,
+                    delete_by = timezone.now() + timedelta(days=60)
+                )
+
+                new_notification.save()
+    else:
+        message = ""
 
     return return_to_ticket(request.user, request, helpdesk_settings, ticket)
 
@@ -3980,15 +4073,18 @@ def notifications_json(request):
 
 def mark_notification_as_read(request, notification_id):
     notification = get_object_or_404(Notification, id=notification_id, user=request.user)
-    notification.is_read = True
-    notification.save()
+    if not notification.is_read:
+        notification.is_read = True
+        notification.delete_by = timezone.now() + timedelta(days=1)
+        notification.save()
 
     return redirect(notification.ticket.get_absolute_url())
 
 def mark_announcement_as_read(request, notification_id):
     notification = get_object_or_404(Notification, id=notification_id, user=request.user)
-    notification.is_read = True
-    notification.save()
+    if not notification.is_read:
+        notification.is_read = True
+        notification.save()
 
     return JsonResponse({'notification_id': notification_id}, status=status.HTTP_200_OK)
 
@@ -4001,13 +4097,17 @@ def run_actions(request):
         if action == 'mark-read':
             for id in selected:
                 notification = Notification.objects.get(id=int(id), user=request.user)
-                notification.is_read = True
-                notification.save()
+                if not notification.is_read:
+                    notification.is_read = True
+                    notification.delete_by = timezone.now()
+                    notification.save()
         elif action == 'mark-unread':
             for id in selected:
                 notification = Notification.objects.get(id=int(id), user=request.user)
-                notification.is_read = False
-                notification.save()
+                if notification.is_read:
+                    notification.is_read = False
+                    notification.delete_by = timezone.now() + timedelta(days=60)
+                    notification.save()
         elif action == 'delete':
             for id in selected:
                 notification = Notification.objects.get(id=int(id), user=request.user)

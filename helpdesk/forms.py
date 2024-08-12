@@ -1353,16 +1353,13 @@ class MultipleTicketSelectForm(forms.Form):
             raise ValidationError(_('All selected tickets must share the same queue in order to be merged.'))
         return tickets
     
-class AnnouncementDateWidget(forms.widgets.DateInput):
-    template_name = 'helpdesk/include/announcement_date.html'
-    
 class AnnouncementForm(forms.ModelForm):
     class Meta:
         model = Notification
         exclude = ['user', 'ticket', 'organization', 'is_read', 'created', 'announcement']
         widgets = {
             'message': forms.Textarea(attrs={'class': 'form-control'}),
-            'delete_by': forms.DateInput(attrs={'id': 'datefield', 'class': 'form-control', 'type': 'datetime-local', 'style': 'width: 25%'})
+            'delete_by': forms.DateInput(attrs={'id': 'datefield', 'class': 'form-control', 'type': 'datetime-local'})
         }
         help_texts = {
             'message': 'Message to be displayed'
