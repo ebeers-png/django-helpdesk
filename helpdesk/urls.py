@@ -389,6 +389,11 @@ if helpdesk_settings.HELPDESK_KB_ENABLED:
         url(r'^kb_iframe/(?P<slug>[A-Za-z0-9_-]+)/$',
             kb.category_iframe,
             name='kb_category_iframe'),
+
+        url(r'^kb_search/$',
+            kb.kb_search,
+            name='kb_search'),
+
     ]
 else:  # 9/24: else-block added in case KB isn't enabled. Delete block later
     urlpatterns += [

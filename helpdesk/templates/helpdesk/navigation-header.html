@@ -19,7 +19,8 @@
       <!-- Navbar Search -->
       <form class="d-none d-md-inline-block form-inline ml-auto mr-0 mr-md-3 my-2 my-md-0" id='searchform' method='get' action="{% url 'helpdesk:list' %}">
         <div class="input-group">
-          <input type="text" class="form-control" name='q' size='15' placeholder='{% trans "Search..." %}' id='search_query' title='{% trans "Enter a keyword, or a ticket number to jump straight to that ticket." %}' aria-label="Search" aria-describedby="basic-addon2">
+          <label class="navbar-brand mr-auto beam-navbar-header-shadow">Search Tickets: </label>
+          <input type="text" class="form-control ml-2" name='q' size='15' placeholder='{% trans "Search..." %}' id='search_query' title='{% trans "Enter a keyword, or a ticket number to jump straight to that ticket." %}' aria-label="Search" aria-describedby="basic-addon2">
           <input type='hidden' name='search_type' value='header' />
           <div class="input-group-append">
             <button class="btn btn-primary" type="submit">
@@ -29,6 +30,20 @@
         </div>
       </form>
       {% endif %}
+
+      <form class="d-none d-md-inline-block form-inline" id='searchform' method='get' action="{% url 'helpdesk:kb_search' %}">
+        <div class="input-group">
+          <label class="navbar-brand mr-auto beam-navbar-header-shadow">Search Knowledgebase: </label>
+          <input type="text" class="form-control ml-2" name='q' size='15' placeholder='{% trans "Search..." %}' id='search_query' title='{% trans "Enter a keyword, or a ticket number to jump straight to that ticket." %}' aria-label="Search" aria-describedby="basic-addon2">
+          <input type='hidden' name='search_type' value='header' />
+          <input type='hidden' name='org' value='{{ user_info.default_org.name }}' />
+          <div class="input-group-append">
+          <button class="btn btn-primary" type="submit">
+              <i class="fas fa-search"></i> {% trans 'Go' %}
+          </button>
+          </div>
+        </div>
+        </form>
       <!-- Org Name with Org Dropdown Selection -->
       <div class="dropdown">
         {% if user_info.orgs and user_info.orgs|length > 1 %}

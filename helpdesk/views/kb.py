@@ -13,12 +13,16 @@ from django.http import HttpResponseRedirect, Http404, JsonResponse
 from django.shortcuts import render, get_object_or_404
 from django.views.decorators.clickjacking import xframe_options_exempt
 from django.urls import reverse
+from django.contrib.postgres.search import TrigramSimilarity, SearchVector
+from django.db.models import Q, F
 
 from helpdesk import settings as helpdesk_settings
 from helpdesk import user
 from helpdesk.models import KBCategory, KBItem, KBIAttachment, Notification
 from helpdesk.decorators import is_helpdesk_staff, helpdesk_staff_member_required
 from helpdesk.forms import EditKBCategoryForm, EditKBItemForm
+
+
 
 import datetime
 
@@ -465,3 +469,42 @@ def vote(request, item):
             item.voted_by.remove(request.user.pk)
     item.save()
     return HttpResponseRedirect(item.get_absolute_url())
+
+def kb_search(request):
+    
+    if request.GET.get('search_type', None) == 'header':
+        query = request.GET.get('q')
+        
+        if is_helpdesk_staff(request.user):
+            org = request.user.default_organization.helpdesk_organization.name
+        else:
+            org = request.GET.get('org')
+
+        organization_categories = KBCategory.objects.filter(organization__name=org)
+
+        categories = KBCategory.objects\
+                .annotate(similarity = TrigramSimilarity('title', query))\
+                    .filter(Q(title__icontains=query) | Q(similarity__gt=0.3), organization__name=org)
+
+        articles = KBItem.objects\
+            .annotate(search=SearchVector('answer'),
+                      title_similarity=TrigramSimilarity('title', query),
+                      question_similarity=TrigramSimilarity('question', query),
+                      similarity=F('title_similarity') + F('question_similarity'))\
+                .filter(Q(title__icontains=query) 
+                        | Q(question__icontains=query)
+                        | Q(title_similarity__gt=0.3)
+                        | Q(question_similarity__gt=0.3) 
+                        | Q(answer__icontains=query),
+                        category__in=organization_categories)\
+                .order_by("-similarity")
+        
+
+        announcements = Notification.objects.filter(organization__name=org, announcement=True, is_read=False).order_by('-created')
+
+        return render(request, 'helpdesk/kb_search_results.html', dict(
+            q=query,
+            categories=categories,
+            articles=articles,
+            unread_announcements=announcements
+        ))
