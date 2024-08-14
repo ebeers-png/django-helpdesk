@@ -1453,23 +1453,29 @@ def update_ticket(request, ticket_id, public=False):
             )
 
             new_notification.save()
+    if is_helpdesk_staff(request.user):
+        mention_pattern = re.compile(r'@\"(.*?)\"')
 
-    mention_pattern = re.compile(r'@\"(.*?)\"')
+        for match in mention_pattern.findall(comment):
+            try:
+                first_name, last_name = match.split()
+                user = User.objects.get(first_name=first_name, last_name=last_name)
+                message = f'{user.get_full_name()} mentioned you in ticket {ticket.id}'
+            except ValueError:
+                user = User.objects.get(email=match)
+                message = f'{user.email} mentioned you in ticket {ticket.id}'
+                
+            if is_helpdesk_staff(user) and user.usersettings_helpdesk.enable_notifications:
+                new_notification = Notification(
+                    user=user,
+                    ticket=ticket,
+                    organization=ticket.ticket_form.organization,
+                    message = message,
+                    is_read=False,
+                    delete_by=timezone.now() + timedelta(days=60)
+                )
 
-    for match in mention_pattern.findall(comment):
-        first_name, last_name = match.split()
-        user = User.objects.get(first_name=first_name, last_name=last_name)
-
-        new_notification = Notification(
-            user=user,
-            ticket=ticket,
-            organization=ticket.ticket_form.organization,
-            message = "You have been mentioned in ticket " + str(ticket.id),
-            is_read=False,
-            delete_by=timezone.now() + timedelta(days=60)
-        )
-
-        new_notification.save()
+                new_notification.save()
 
     return return_to_ticket(request.user, request, helpdesk_settings, ticket)
 

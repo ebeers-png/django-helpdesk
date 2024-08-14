@@ -164,10 +164,15 @@ def get_markdown(text, org, kb=False):
                 except ValueError:
                     return match.group(0)
             
-            formatted_mention = f'<span style="color:blue">@{user.first_name} {user.last_name}</span>'
+            if is_helpdesk_staff(user):
+                formatted_mention = f'<span style="color:blue">@{user.first_name} {user.last_name}</span>'
 
-            return formatted_mention
+                return formatted_mention
+            else:
+                return match.group(0)
         except User.DoesNotExist:
+            return match.group(0)
+        except User.MultipleObjectsReturned:
             return match.group(0)
     
     domain = org.domain
