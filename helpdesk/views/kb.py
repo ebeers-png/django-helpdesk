@@ -14,7 +14,8 @@ from django.shortcuts import render, get_object_or_404
 from django.views.decorators.clickjacking import xframe_options_exempt
 from django.urls import reverse
 from django.contrib.postgres.search import TrigramSimilarity, SearchVector
-from django.db.models import Q, F
+from django.db.models import Q
+from django.db import connection, reset_queries
 
 from helpdesk import settings as helpdesk_settings
 from helpdesk import user
@@ -471,36 +472,36 @@ def vote(request, item):
     return HttpResponseRedirect(item.get_absolute_url())
 
 def kb_search(request):
-    
+    reset_queries()
     if request.GET.get('search_type', None) == 'header':
+        # Gets user input
         query = request.GET.get('q')
         
+        # Get organization
         if is_helpdesk_staff(request.user):
             org = request.user.default_organization.helpdesk_organization.name
         else:
             org = request.GET.get('org')
 
+        # Get all possible categories so articles from different organizations don't show up
         organization_categories = KBCategory.objects.filter(organization__name=org)
 
+        # Filters for categories with titles that either have the keyword or have words similar to it
         categories = KBCategory.objects\
-                .annotate(similarity = TrigramSimilarity('title', query))\
-                    .filter(Q(title__icontains=query) | Q(similarity__gt=0.3), organization__name=org)
+                .annotate(search=SearchVector('title'))\
+                    .filter(Q(search=query), organization__name=org)
 
+        # Filters articles by looking at titles, questions, and answers 
         articles = KBItem.objects\
-            .annotate(search=SearchVector('answer'),
-                      title_similarity=TrigramSimilarity('title', query),
-                      question_similarity=TrigramSimilarity('question', query),
-                      similarity=F('title_similarity') + F('question_similarity'))\
-                .filter(Q(title__icontains=query) 
-                        | Q(question__icontains=query)
-                        | Q(title_similarity__gt=0.3)
-                        | Q(question_similarity__gt=0.3) 
-                        | Q(answer__icontains=query),
+            .annotate(search=SearchVector('answer', 'title', 'question'),)\
+                .filter(Q(search=query),
                         category__in=organization_categories)\
-                .order_by("-similarity")
         
 
         announcements = Notification.objects.filter(organization__name=org, announcement=True, is_read=False).order_by('-created')
+
+        print("HERE IS THE QWUERY (*****************)")
+        print(connection.queries)
 
         return render(request, 'helpdesk/kb_search_results.html', dict(
             q=query,

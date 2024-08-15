@@ -34,7 +34,7 @@
       <form class="d-none d-md-inline-block form-inline" id='searchform' method='get' action="{% url 'helpdesk:kb_search' %}">
         <div class="input-group">
           <label class="navbar-brand mr-auto beam-navbar-header-shadow">Search Knowledgebase: </label>
-          <input type="text" class="form-control ml-2" name='q' size='15' placeholder='{% trans "Search..." %}' id='search_query' title='{% trans "Enter a keyword, or a ticket number to jump straight to that ticket." %}' aria-label="Search" aria-describedby="basic-addon2">
+          <input type="text" class="form-control ml-2" name='q' size='15' placeholder='{% trans "Search..." %}' id='search_query' title='{% trans "Enter a keyword to search through Knowledgebase catetgories and articles." %}' aria-label="Search" aria-describedby="basic-addon2">
           <input type='hidden' name='search_type' value='header' />
           <input type='hidden' name='org' value='{{ user_info.default_org.name }}' />
           <div class="input-group-append">

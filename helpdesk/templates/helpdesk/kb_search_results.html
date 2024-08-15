@@ -22,10 +22,121 @@
 
 {% block helpdesk_body %}
 
-{% for category in categories %}
-<p>{{category.title}}</p>
-{% endfor %}
+<form class="d-none d-md-inline-block form-inline" id='searchform' method='get' action="{% url 'helpdesk:kb_search' %}">
+    <div class="input-group custom-search-input">
+      <input type="text" class="form-control search-box ml-2 mb-4" name='q' size='15' placeholder='Search...' id='search_query' title='{% trans "Enter a keyword to search through Knowledgebase catetgories and articles." %}' aria-label="Search" aria-describedby="basic-addon2" value="{{ q|default_if_none:'' }}" />
+      <input type='hidden' name='search_type' value='header' />
+      <input type='hidden' name='org' value='{{ user_info.default_org.name }}' />
+      <div class="input-group-append">
+        <button class="btn btn-primary search-button mb-4" type="submit">
+            <i class="fas fa-search"></i> {% trans 'Go' %}
+        </button>
+      </div>
+    </div>
+</form>
 
-{{articles}}
+<div class="mb-3">
+    <h2>
+        {% trans "Categories" %}
+    <h2>
+    <div class="" id="categories" style="margin-top: 15px">
+        {% for category in categories %}
+            <div class="card" style="margin-top: 15px">
+                <div class="card-header">
+                    <h3>{{ category.title }}</h5>
+                </div>
+                <div class="card-body" style="margin-top:-15px">
+                    <small class="card-text"><div class="truncate-text">{% if not category.get_preview_markdown %}{{ category.get_description_markdown }}{% else %}{{ category.get_preview_markdown }}{% endif %}</div></small>
+                    <p class="card-text"><small class="text-muted"><a class="btn btn-primary" href='{{ category.get_absolute_url }}{{ user_info.url }}'>{% trans 'View articles' %} <i class="fa fa-share"></i></a></small></p>
+                </div>
+            </div>
+        {% endfor %}
+    </div>
+</div>
+
+<div class=" mb-3 mt-3">
+    <h2>
+        {% trans "Articles" %}
+    </h2>
+
+        {% for article in articles %}
+            <div class="card mb-3">
+                <div class="card-body">
+                     <a href='{{ article.get_absolute_url }}/{{ user_info.url }}'>
+                         <h5 class="card-title">{{ article.question }}</h5>
+                     </a>
+                </div>
+            </div>
+            {% endfor %}
+</div>
+
+{% endblock %}
+
+{% block helpdesk_js %}
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        const elements = document.querySelectorAll('.truncate-text');
+
+        elements.forEach(element => {
+            const maxLength = 120
+
+            if (element.textContent.length > maxLength) {
+                element.textContent = element.textContent.slice(0, maxLength) + '...';
+            }
+        }); 
+    });
+
+    $(".checkmarkbutton").on('click', function() {
+        announcementId = $(this).data('id');
+
+        $.ajax({
+            url: "{% url 'helpdesk:mark_announcement_as_read' 0 %}".replace('0', announcementId),
+            type: "POST",
+            data: {
+                csrfmiddlewaretoken: '{{ csrf_token }}',
+            },
+            success: function() {
+                
+            }
+        });
+    });
+</script>
+<style>
+    .custom-search-input .search-box {
+        border-radius: 24px 0 0 24px;
+        padding: 10px 20px;
+        border: 1px solid #ddd;
+        box-shadow: 0 1px 6px rgba(32,33,36,.28);
+        transition: box-shadow 0.3s ease;
+        font-size: 16px;
+    }
+
+    .custom-search-input .search-box:focus {
+        box-shadow: 0 1px 6px rgba(32,33,36,.40);
+        border-color: #4285f4;
+    }
+
+    .custom-search-input .search-button {
+        border-radius: 0 24px 24px 0;
+        padding: 7px 15px;
+        margin-top: -0.3px;
+        border: 1px solid #ddd;
+        border-left: none;
+        box-shadow: 0 1px 6px rgba(32,33,36,.28);
+        background-color: #4285f4;
+        color: white;
+        font-size: 16px;
+        transition: background-color 0.3s ease;
+    }
+
+    .custom-search-input .search-button:hover {
+        background-color: #357ae8;
+    }
+
+    .custom-search-input .input-group {
+        max-width: 600px; /* Adjust width as needed */
+        margin: 0 auto;
+    }
+</style>
 
 {% endblock %}

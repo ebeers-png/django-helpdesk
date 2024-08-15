@@ -93,3 +93,23 @@
         {% endif %}
 
 {% endblock %}
+
+{% block helpdesk_js %}
+<script>
+    $(".checkmarkbutton").on('click', function() {
+        announcementId = $(this).data('id');
+
+        $.ajax({
+            url: "{% url 'helpdesk:mark_announcement_as_read' 0 %}".replace('0', announcementId),
+            type: "POST",
+            data: {
+                csrfmiddlewaretoken: '{{ csrf_token }}',
+            },
+            success: function() {
+                
+            }
+        });
+    });
+</script>
+
+{% endblock %}
