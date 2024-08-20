@@ -488,15 +488,26 @@ def kb_search(request):
         organization_categories = KBCategory.objects.filter(organization__name=org)
 
         # Filters for categories with titles that either have the keyword or have words similar to it
-        categories = KBCategory.objects\
-                .annotate(search=SearchVector('title'))\
-                    .filter(Q(search=query), organization__name=org)
+        if is_helpdesk_staff(request.user):
+            categories = KBCategory.objects\
+                    .annotate(search=SearchVector('title', 'preview_description', 'description'))\
+                        .filter(Q(search=query), organization__name=org)
+        else:
+            categories = KBCategory.objects\
+                    .annotate(search=SearchVector('title', 'preview_description', 'description'))\
+                        .filter(Q(search=query), organization__name=org, public=True)
 
         # Filters articles by looking at titles, questions, and answers 
-        articles = KBItem.objects\
+        if is_helpdesk_staff(request.user):
+            articles = KBItem.objects\
+                .annotate(search=SearchVector('answer', 'title', 'question'),)\
+                    .filter(Q(search=query),
+                            category__in=organization_categories)
+        else:
+            articles = KBItem.objects\
             .annotate(search=SearchVector('answer', 'title', 'question'),)\
                 .filter(Q(search=query),
-                        category__in=organization_categories)
+                        category__in=organization_categories, unlisted=False, enabled=True)
 
         reset_queries()
         print("HERE IS THE QWUERY (*****************)")
