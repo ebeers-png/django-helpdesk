@@ -46,7 +46,7 @@
                     <h3>{{ category.title }}</h5>
                 </div>
                 <div class="card-body" style="margin-top:-15px">
-                    <small class="card-text"><div class="truncate-text">{% if not category.get_preview_markdown %}{{ category.get_description_markdown }}{% else %}{{ category.get_preview_markdown }}{% endif %}</div></small>
+                    <small style="font-size: 60%;"><div class="truncate-text">{% if not category.get_preview_markdown %}{{ category.get_description_markdown }}{% else %}{{ category.get_preview_markdown }}{% endif %}</div></small>
                     <p class="card-text"><small class="text-muted"><a class="btn btn-primary" href='{{ category.get_absolute_url }}{{ user_info.url }}'>{% trans 'View articles' %} <i class="fa fa-share"></i></a></small></p>
                 </div>
             </div>

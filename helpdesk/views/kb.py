@@ -487,21 +487,29 @@ def kb_search(request):
         organization_categories = KBCategory.objects.filter(organization__name=org)
 
         # Filters for categories with titles that either have the keyword or have words similar to it
-        categories = KBCategory.objects\
-                .annotate(search=SearchVector('title'))\
-                    .filter(Q(search=query), organization__name=org)
+        if is_helpdesk_staff(request.user):
+            categories = KBCategory.objects\
+                    .annotate(search=SearchVector('title', 'preview_description', 'description'))\
+                        .filter(Q(search=query), organization__name=org)
+        else:
+            categories = KBCategory.objects\
+                    .annotate(search=SearchVector('title', 'preview_description', 'description'))\
+                        .filter(Q(search=query), organization__name=org, public=True)
 
         # Filters articles by looking at titles, questions, and answers 
-        articles = KBItem.objects\
-            .annotate(search=SearchVector('answer', 'title', 'question'),)\
-                .filter(Q(search=query),
-                        category__in=organization_categories)\
+        if is_helpdesk_staff(request.user):
+            articles = KBItem.objects\
+                .annotate(search=SearchVector('answer', 'title', 'question'),)\
+                    .filter(Q(search=query),
+                            category__in=organization_categories)
+        else:
+            articles = KBItem.objects\
+                    .annotate(search=SearchVector('answer', 'title', 'question'),)\
+                        .filter(Q(search=query),
+                                category__in=organization_categories, enabled=True, unlisted=False)
         
 
         announcements = Notification.objects.filter(organization__name=org, announcement=True, is_read=False).order_by('-created')
-
-        print("HERE IS THE QWUERY (*****************)")
-        print(connection.queries)
 
         return render(request, 'helpdesk/kb_search_results.html', dict(
             q=query,
