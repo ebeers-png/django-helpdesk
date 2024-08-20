@@ -16,6 +16,7 @@ from django.urls import reverse
 from django.contrib.postgres.search import TrigramSimilarity, SearchVector
 from django.db.models import Q
 from django.db import connection, reset_queries
+import pprint
 
 from helpdesk import settings as helpdesk_settings
 from helpdesk import user
@@ -472,7 +473,7 @@ def vote(request, item):
     return HttpResponseRedirect(item.get_absolute_url())
 
 def kb_search(request):
-    reset_queries()
+    pp = pprint.PrettyPrinter(indent=4)
     if request.GET.get('search_type', None) == 'header':
         # Gets user input
         query = request.GET.get('q')
@@ -497,19 +498,19 @@ def kb_search(request):
                         .filter(Q(search=query), organization__name=org, public=True)
 
         # Filters articles by looking at titles, questions, and answers 
-        if is_helpdesk_staff(request.user):
-            articles = KBItem.objects\
-                .annotate(search=SearchVector('answer', 'title', 'question'),)\
-                    .filter(Q(search=query),
-                            category__in=organization_categories)
-        else:
-            articles = KBItem.objects\
-                    .annotate(search=SearchVector('answer', 'title', 'question'),)\
-                        .filter(Q(search=query),
-                                category__in=organization_categories, enabled=True, unlisted=False)
-        
+        articles = KBItem.objects\
+            .annotate(search=SearchVector('answer', 'title', 'question'),)\
+                .filter(Q(search=query),
+                        category__in=organization_categories)
+
+        reset_queries()
+        print("HERE IS THE QWUERY (*****************)")
+        list(categories)
+        list(articles)
+        pp.pprint(connection.queries)
 
         announcements = Notification.objects.filter(organization__name=org, announcement=True, is_read=False).order_by('-created')
+
 
         return render(request, 'helpdesk/kb_search_results.html', dict(
             q=query,
