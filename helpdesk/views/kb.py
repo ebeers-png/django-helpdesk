@@ -13,9 +13,10 @@ from django.http import HttpResponseRedirect, Http404, JsonResponse
 from django.shortcuts import render, get_object_or_404
 from django.views.decorators.clickjacking import xframe_options_exempt
 from django.urls import reverse
-from django.contrib.postgres.search import TrigramSimilarity, SearchVector
+from django.contrib.postgres.search import SearchVector
 from django.db.models import Q
 from django.db import connection, reset_queries
+import pprint
 
 from helpdesk import settings as helpdesk_settings
 from helpdesk import user
@@ -472,8 +473,8 @@ def vote(request, item):
     return HttpResponseRedirect(item.get_absolute_url())
 
 def kb_search(request):
-    reset_queries()
-    reset_queries()
+    pp = pprint.PrettyPrinter(indent=4)
+
     if request.GET.get('search_type', None) == 'header':
         # Gets user input
         query = request.GET.get('q')
@@ -496,15 +497,7 @@ def kb_search(request):
             categories = KBCategory.objects\
                     .annotate(search=SearchVector('title', 'preview_description', 'description'))\
                         .filter(Q(search=query), organization__name=org, public=True)
-        if is_helpdesk_staff(request.user):
-            categories = KBCategory.objects\
-                    .annotate(search=SearchVector('title', 'preview_description', 'description'))\
-                        .filter(Q(search=query), organization__name=org)
-        else:
-            categories = KBCategory.objects\
-                    .annotate(search=SearchVector('title', 'preview_description', 'description'))\
-                        .filter(Q(search=query), organization__name=org, public=True)
-
+            
         # Filters articles by looking at titles, questions, and answers 
         if is_helpdesk_staff(request.user):
             articles = KBItem.objects\
@@ -524,11 +517,6 @@ def kb_search(request):
         pp.pprint(connection.queries)
 
         announcements = Notification.objects.filter(organization__name=org, announcement=True, is_read=False).order_by('-created')
-
-        print("HERE IS THE QWUERY (*****************)")
-        print(connection.queries)
-        print("HERE IS THE QWUERY (*****************)")
-        print(connection.queries)
 
         return render(request, 'helpdesk/kb_search_results.html', dict(
             q=query,
