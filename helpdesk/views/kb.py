@@ -473,6 +473,7 @@ def vote(request, item):
 
 def kb_search(request):
     reset_queries()
+    reset_queries()
     if request.GET.get('search_type', None) == 'header':
         # Gets user input
         query = request.GET.get('q')
@@ -487,6 +488,14 @@ def kb_search(request):
         organization_categories = KBCategory.objects.filter(organization__name=org)
 
         # Filters for categories with titles that either have the keyword or have words similar to it
+        if is_helpdesk_staff(request.user):
+            categories = KBCategory.objects\
+                    .annotate(search=SearchVector('title', 'preview_description', 'description'))\
+                        .filter(Q(search=query), organization__name=org)
+        else:
+            categories = KBCategory.objects\
+                    .annotate(search=SearchVector('title', 'preview_description', 'description'))\
+                        .filter(Q(search=query), organization__name=org, public=True)
         if is_helpdesk_staff(request.user):
             categories = KBCategory.objects\
                     .annotate(search=SearchVector('title', 'preview_description', 'description'))\
@@ -516,6 +525,8 @@ def kb_search(request):
 
         announcements = Notification.objects.filter(organization__name=org, announcement=True, is_read=False).order_by('-created')
 
+        print("HERE IS THE QWUERY (*****************)")
+        print(connection.queries)
         print("HERE IS THE QWUERY (*****************)")
         print(connection.queries)
 
