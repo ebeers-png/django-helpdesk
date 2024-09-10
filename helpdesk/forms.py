@@ -146,8 +146,8 @@ class CustomFieldMixin(object):
                     instanceargs['widget'] = forms.TimeInput(attrs={'class': 'form-control time-field', 'autocomplete': 'off'})
                 elif fieldclass == forms.BooleanField:
                     instanceargs['widget'] = forms.CheckboxInput(attrs={'class': 'form-control'})
-                elif fieldclass == forms.FileField:
-                    instanceargs['widget'] = ClearableFileInput(attrs={'class': 'form-control-file'})
+                # elif fieldclass == forms.FileField:
+                    # instanceargs['widget'] = ClearableFileInput(attrs={'class': 'form-control-file', 'multiple': True})
 
             except KeyError:
                 # The data_type was not found anywhere
@@ -329,6 +329,19 @@ class EditKBCategoryForm(forms.ModelForm):
 
 class AttachmentFileInputWidget(forms.ClearableFileInput):
     template_name = 'helpdesk/include/attachment_input.html'
+
+class ClearableFileField(forms.FileField):
+    def __init__(self, *args, **kwargs):
+        kwargs.setdefault("widget", ClearableFileInput())
+        super().__init__(*args, **kwargs)
+
+    def clean(self, data, initial=None):
+        single_file_clean = super().clean
+        if isinstance(data, (list, tuple)):
+            result = [single_file_clean(d, initial) for d in data]
+        else:
+            result = [single_file_clean(data, initial)]
+        return result
 
 class ClearableFileInput(forms.ClearableFileInput):
     allow_multiple_selected = True # Must specify as of Django 3.2.19
@@ -679,7 +692,7 @@ class AbstractTicketForm(CustomFieldMixin, forms.Form):
         initial=getattr(settings, 'HELPDESK_PUBLIC_TICKET_PRIORITY', '3'),
         required=False
     )
-    attachment = forms.FileField(
+    attachment = ClearableFileField(
         widget=ClearableFileInput(attrs={'class': 'form-control-file', 'multiple': True}),
         required=False
     )
