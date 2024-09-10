@@ -231,6 +231,8 @@ def create_queue(request):
                 escalate_days = form.cleaned_data['escalate_days'],
                 enable_notifications_on_email_events = form.cleaned_data['enable_notifications_on_email_events'],
                 default_owner = form.cleaned_data['default_owner'],
+                new_ticket_cc = form.cleaned_data['new_ticket_cc'],
+                updated_ticket_cc = form.cleaned_data['updated_ticket_cc'],
                 reassign_when_closed = form.cleaned_data['reassign_when_closed'],
                 dedicated_time = form.cleaned_data['dedicated_time'],
             )
@@ -250,6 +252,8 @@ def create_queue(request):
                 'escalate_days': form.cleaned_data['escalate_days'],
                 'enable_notifications_on_email_events': form.cleaned_data['enable_notifications_on_email_events'],
                 'default_owner': form.cleaned_data['default_owner'],
+                'new_ticket_cc': form.cleaned_data['new_ticket_cc'],
+                'updated_ticket_cc': form.cleaned_data['updated_ticket_cc'],
                 'reassign_when_closed': form.cleaned_data['reassign_when_closed'],
                 'dedicated_time': form.cleaned_data['dedicated_time'],
             }
@@ -286,6 +290,8 @@ def edit_queue(request, slug):
                 'enable_notifications_on_email_events': queue.enable_notifications_on_email_events,
                 'default_owner': queue.default_owner,
                 'reassign_when_closed': queue.reassign_when_closed,
+                'new_ticket_cc': queue.new_ticket_cc,
+                'updated_ticket_cc': queue.updated_ticket_cc,
                 'dedicated_time': queue.dedicated_time,
                 'importer': queue.importer if queue.importer else None,
             }
@@ -308,6 +314,8 @@ def edit_queue(request, slug):
             queue.escalate_days = form.cleaned_data['escalate_days']
             queue.enable_notifications_on_email_events = form.cleaned_data['enable_notifications_on_email_events']
             queue.default_owner = form.cleaned_data['default_owner']
+            queue.new_ticket_cc = form.cleaned_data['new_ticket_cc']
+            queue.updated_ticket_cc = form.cleaned_data['updated_ticket_cc']
             queue.reassign_when_closed = form.cleaned_data['reassign_when_closed']
             queue.dedicated_time = form.cleaned_data['dedicated_time']
 
@@ -1595,14 +1603,10 @@ def stop_timer(request):
         userr = request.user
         ticket_id = request.POST.get('ticket_id')
         ticket = get_object_or_404(Ticket, id=ticket_id)
-
-        for timespent in TimeSpent.objects.all():
-            if timespent.user == userr and timespent.ticket == ticket and not timespent.stop_time:
-                timespent.stop_time = timezone.now()
-                timespent.save()
-                return JsonResponse({'stop_time': timespent.stop_time})
-
-        return JsonResponse({'ticket_id': ticket_id})
+        for timespent in TimeSpent.objects.filter(user=userr, ticket=ticket, stop_time__isnull=True):
+            timespent.stop_time = timezone.now()
+            timespent.save()
+        return JsonResponse({'total_time_spent': ticket.time_spent_formatted})
 
 
 @helpdesk_staff_member_required
@@ -1610,10 +1614,10 @@ def get_elapsed_time(request, ticket_id):
     if request.method == 'GET':
         userr = request.user
         ticket = get_object_or_404(Ticket, id=ticket_id)
-        for timespent in TimeSpent.objects.all():
-            if timespent.user == userr and timespent.ticket == ticket and not timespent.stop_time:
-                return JsonResponse({'start_time': timespent.start_time})
-        return JsonResponse({'start_time': None})
+        timespent = TimeSpent.objects.filter(user=userr, ticket=ticket, stop_time__isnull=True).first()
+        if timespent:
+            return JsonResponse({'start_time': timespent.start_time})
+    return JsonResponse({'start_time': None})
 
 def return_to_ticket(user, request, helpdesk_settings, ticket):
     """Helper function for update_ticket"""
@@ -2545,12 +2549,12 @@ def run_report(request, report):
         return HttpResponseRedirect(reverse('helpdesk:report_index'))
 
     if request.GET.get('saved-query', None):
-        Query(report_queryset, query_to_base64(query_params))
+        report_queryset = Query(report_queryset, query_to_base64(query_params)).__run__(report_queryset)
 
     from collections import defaultdict
-    summarytable = defaultdict(int)
+    summarytable = defaultdict(lambda: "")
     # a second table for more complex queries
-    summarytable2 = defaultdict(int)
+    summarytable2 = defaultdict(lambda: "")
 
     first_ticket = Ticket.objects.all().order_by('created')[0]
     first_month = first_ticket.created.month
@@ -2618,7 +2622,7 @@ def run_report(request, report):
         charttype = 'date'
 
     elif report == 'daysuntilticketclosedbymonth':
-        title = _('Days until ticket closed by Month')
+        title = _('Average days until ticket was closed (by created month)')
         col1heading = _('Queue')
         possible_options = periods
         charttype = 'date'
@@ -2654,21 +2658,31 @@ def run_report(request, report):
             metric2 = u'%s-%s' % (ticket.created.year, ticket.created.month)
 
         elif report == 'daysuntilticketclosedbymonth':
+            if ticket.status not in [Ticket.CLOSED_STATUS, Ticket.RESOLVED_STATUS, Ticket.DUPLICATE_STATUS]: continue
             metric1 = u'%s' % ticket.queue.title
             metric2 = u'%s-%s' % (ticket.created.year, ticket.created.month)
             metric3 = ticket.modified - ticket.created
             metric3 = metric3.days
 
-        summarytable[metric1, metric2] += 1
+        if (metric1, metric2) in summarytable: 
+            summarytable[metric1, metric2] += 1
+        else: 
+            summarytable[metric1, metric2] = 1
+
         if metric3:
             if report == 'daysuntilticketclosedbymonth':
-                summarytable2[metric1, metric2] += metric3
+                if (metric1, metric2) in summarytable2: 
+                    summarytable2[metric1, metric2] += metric3
+                else: 
+                    summarytable2[metric1, metric2] = metric3
 
     table = []
 
     if report == 'daysuntilticketclosedbymonth':
         for key in summarytable2.keys():
-            summarytable[key] = summarytable2[key] / summarytable[key]
+            summarytable[key] = round(summarytable2[key] / summarytable[key], 1)
+            if float(summarytable[key]) == int(summarytable[key]): 
+                summarytable[key] = int(summarytable[key])
 
     header1 = sorted(set(list(i for i, _ in summarytable.keys())))
 
@@ -2682,9 +2696,9 @@ def run_report(request, report):
         data = []
         for hdr in possible_options:
             if hdr not in totals.keys():
-                totals[hdr] = summarytable[item, hdr]
+                totals[hdr] = summarytable[item, hdr] or 0
             else:
-                totals[hdr] += summarytable[item, hdr]
+                totals[hdr] += summarytable[item, hdr] or 0
             data.append(summarytable[item, hdr])
         table.append([item] + data)
 
@@ -2696,7 +2710,7 @@ def run_report(request, report):
         seriesnum += 1
         datadict = {"x": label}
         for n in range(0, len(table)):
-            datadict[n] = table[n][seriesnum]
+            datadict[n] = 0 if table[n][seriesnum] == "" else table[n][seriesnum]
         morrisjs_data.append(datadict)
 
     series_names = []
@@ -3212,15 +3226,16 @@ def ticket_dependency_add(request, ticket_id):
         return perm
 
     if request.method == 'POST':
-        form = TicketDependencyForm(request.POST)
+        form = TicketDependencyForm(request.POST, org=ticket.queue.organization)
         if form.is_valid():
             ticketdependency = form.save(commit=False)
             ticketdependency.ticket = ticket
-            if ticketdependency.ticket != ticketdependency.depends_on:
+            if not TicketDependency.objects.filter(ticket=ticket, depends_on=ticketdependency.depends_on).exists()\
+                    and ticketdependency.ticket != ticketdependency.depends_on:
                 ticketdependency.save()
             return HttpResponseRedirect(reverse('helpdesk:view', args=[ticket.id]))
     else:
-        form = TicketDependencyForm()
+        form = TicketDependencyForm(None, org=ticket.queue.organization)
     return render(request, 'helpdesk/ticket_dependency_add.html', {
         'ticket': ticket,
         'form': form,
