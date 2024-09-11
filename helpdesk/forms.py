@@ -146,8 +146,8 @@ class CustomFieldMixin(object):
                     instanceargs['widget'] = forms.TimeInput(attrs={'class': 'form-control time-field', 'autocomplete': 'off'})
                 elif fieldclass == forms.BooleanField:
                     instanceargs['widget'] = forms.CheckboxInput(attrs={'class': 'form-control'})
-                # elif fieldclass == forms.FileField:
-                    # instanceargs['widget'] = ClearableFileInput(attrs={'class': 'form-control-file', 'multiple': True})
+                elif fieldclass == forms.FileField:
+                    instanceargs['widget'] = ClearableFileInput(attrs={'class': 'form-control-file', 'multiple': True})
 
             except KeyError:
                 # The data_type was not found anywhere
