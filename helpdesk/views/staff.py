@@ -2514,7 +2514,8 @@ def save_query(request):
     query_unencoded['visible_cols'] = visible_cols
     query_encoded = query_to_base64(query_unencoded)
 
-    query = SavedSearch(title=title, shared=shared, query=query_encoded, user=request.user)
+    org = request.user.default_organization.helpdesk_organization
+    query = SavedSearch(title=title, shared=shared, query=query_encoded, user=request.user, organization=org)
     query.save()
 
     return HttpResponseRedirect('%s?saved-query=%s' % (reverse('helpdesk:list'), query.id))
