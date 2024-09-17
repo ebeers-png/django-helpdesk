@@ -2001,7 +2001,7 @@ def ticket_list(request):
             query_params['filtering'][int_list_filter_in_params[param]] = [-1]
 
     # Choices/data for the rest of the page
-    user_saved_queries = SavedSearch.objects.filter(user=request.user)  # todo: + org
+    user_saved_queries = SavedSearch.objects.filter(user=request.user, organization=org)  # todo: + org
     form_choices = FormType.objects.filter(organization=org).order_by('name')
     user_choices = list_of_helpdesk_staff(org).order_by('last_name', 'first_name', 'email').values('id', 'username', 'first_name', 'last_name')
     tag_choices = Tag.objects.filter(organization=org).order_by('name').values('id', 'name', 'color')
