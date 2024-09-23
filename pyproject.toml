@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 packages = ["helpdesk"]
 
 [project]
-name = "django-helpdesk"
+name = "helpdesk"
 dynamic = ["version"]
 description = "Helpdesk in Django"
 readme = "README.rst"
@@ -57,10 +57,6 @@ dependencies = [
 
 [project.urls]
 homepage = "https://github.com/ClearlyEnergy/django-helpdesk"
-
-[project.scripts]
-django-helpdesk = "django-helpdesk:develop"
-panfl = "django-helpdesk:panfl"
 
 [tool.setuptools.dynamic]
 version = {attr = "django-helpdesk.version.__version__"}
