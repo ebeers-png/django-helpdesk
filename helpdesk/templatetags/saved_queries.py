@@ -22,7 +22,7 @@ def saved_queries(user):
         else:
             filters = (Q(shared__exact=True) & ~Q(opted_out_users__in=[user]))
         if user.is_authenticated:
-            filters |= Q(user=user)
+            filters |= Q(user=user, organization=user.default_organization)
         user_saved_queries = SavedSearch.objects.filter(filters)
         return user_saved_queries
     except Exception as e:
