@@ -1,5 +1,7 @@
 from django import template
-from django.contrib.humanize.templatetags import naturaltime, naturalday
+from django.contrib.humanize.templatetags.humanize import naturaltime
+from django.utils.translation import gettext as _
+from django.template import defaultfilters
 from datetime import date, datetime
 
 register = template.Library()
@@ -12,6 +14,7 @@ def naturaltimedate(value, arg=None):
     formatted according to settings.DATE_FORMAT.
     """
     tzinfo = getattr(value, 'tzinfo', None)
+    original_value = value
     try:
         value = date(value.year, value.month, value.day)
     except AttributeError:
@@ -20,9 +23,9 @@ def naturaltimedate(value, arg=None):
     today = datetime.now(tzinfo).date()
     delta = value - today
     if delta.days == 0:
-        return _('today')
+        return naturaltime(original_value)
     elif delta.days == 1:
         return _('tomorrow')
     elif delta.days == -1:
         return _('yesterday')
-    return defaultfilters.date(value, arg)
+    return defaultfilters.date(original_value, arg)

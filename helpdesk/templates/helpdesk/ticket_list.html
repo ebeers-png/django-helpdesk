@@ -1,6 +1,7 @@
 {% extends "helpdesk/base.html" %}
 
 {% load i18n humanize static in_list %}
+{% load natural_time_date %}
 
 {% block helpdesk_title %}{% trans "Tickets" %}{% endblock %}
 
@@ -223,9 +224,9 @@
                                         <td>{% if ticket.get_assigned_to != "Unassigned" %}{{ ticket.get_assigned_to }}{% endif %}</td> {# Remove if statement for "Unassigned" instead of blank #}
                                         <td>{{ ticket.submitter_email }}</td>
                                         <td class="d-none">{{ ticket.paired_count }}</td>
-                                        <td>{{ ticket.created|naturaltime|default_if_none:'' }}</td>
-                                        <td>{{ ticket.last_reply|naturaltime|default_if_none:'' }}</td>
-                                        <td class="d-none">{{ ticket.due_date|naturaltime|default_if_none:'' }}</td>
+                                        <td>{{ ticket.created|naturaltimedate|default_if_none:'' }}</td>
+                                        <td>{{ ticket.last_reply|naturaltimedate|default_if_none:'' }}</td>
+                                        <td class="d-none">{{ ticket.due_date|naturaltimedate|default_if_none:'' }}</td>
                                         <td class="d-none">{{ ticket.time_spent_formatted }}</td>
                                         <td class="d-none">{{ ticket.kbitem.title}}</td>
                                         <td class="d-none">
