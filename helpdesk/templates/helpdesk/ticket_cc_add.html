@@ -1,6 +1,6 @@
 {% extends "helpdesk/base.html" %}
 
-{% load i18n %}
+{% load i18n bootstrap4form %}
 
 {% block helpdesk_title %}{% trans "Add Ticket CC" %}{% endblock %}
 
@@ -19,15 +19,13 @@
 
 {% block helpdesk_body %}
     <h2>{% trans 'Add Ticket CC' %}</h2>
-
+    <p>
+        {% trans 'To automatically send an email to a user or e-mail address when this ticket is updated, select the user or enter an e-mail address below.' %}
+    </p>
     <div class="card mb-3">
         <div class="card-header">
-            <i class="fas fa-hand-pointer"></i>
-            {% trans 'To automatically send an email to a user or e-mail address when this ticket is updated, select the user or enter an e-mail address below.' %}
-        </div>
-        <div class="card-body">
             <!-- Nav tabs -->
-            <ul class="nav nav-tabs">
+            <ul class="nav nav-tabs card-header-tabs">
                 <li class="nav-item">
                     <a class="nav-link{% if not form.errors.user %} active{% endif %}" href="#EmailCC" data-toggle="tab">
                         {% trans 'Non-User Email' %}
@@ -40,10 +38,15 @@
                     </a>
                 </li>
             </ul>
+        </div>
+        <div class="card-body">
 
             {% if form.errors %}
-                {% include 'helpdesk/include/alert_form_errors.html' %}
-                <ul>{{ form.non_field_errors }}</ul>
+                {% for field, errors in form.errors.items%}
+                <div class="alert alert-danger alert-dismissible" role="alert">
+                    {{ field|capfirst }}: {{ errors|join:", " }} 
+                </div>
+                {% endfor %}
             {% endif %}
 
             <!-- Tab panes -->
@@ -54,19 +57,10 @@
                         {% csrf_token %}
                         <fieldset>
                             <dl>
-                                {% for field in form_email %}
-                                    <dt>{{ field.label_tag }}</dt>
-                                    <dd>{{ field }}</dd>
-                                    {% if field.name == 'email' and form.errors.email %}
-                                        <dd class='error'>{{ form.errors.email }}</dd>
-                                    {% endif %}
-                                    {% if field.help_text %}
-                                        <dd class='form_help_text'>{{ field.help_text }}</dd>
-                                    {% endif %}
-                                {% endfor %}
+                                {{ form_email|bootstrap4form}}
                             </dl>
                         </fieldset>
-                        <button class="btn btn-primary" type='submit'>{% trans "Save Ticket CC" %}</button>
+                        <button class="btn btn-primary" type='submit'>{% trans "Add Recipient" %}</button>
                     <a href="{% url 'helpdesk:ticket_cc' ticket.id %}" class="btn btn-secondary">
                         {% trans "Cancel" %}
                     </a>
@@ -78,22 +72,13 @@
                         {% csrf_token %}
                         <fieldset>
                             <dl>
-                                {% for field in form_user %}
-                                    <dt>{{ field.label_tag }}</dt>
-                                    <dd>{{ field }}</dd>
-                                    {% if field.name == 'user' and form.errors.user %}
-                                        <dd class='error'>{{ form.errors.user }}</dd>
-                                    {% endif %}
-                                    {% if field.help_text %}
-                                        <dd class='form_help_text'>{{ field.help_text }}</dd>
-                                    {% endif %}
-                                {% endfor %}
+                                {{ form_user|bootstrap4form}}
                             </dl>
                         </fieldset>
-                        <button class="btn btn-primary" type='submit'>{% trans "Save Ticket CC" %}</button>
-                    <a href="{% url 'helpdesk:ticket_cc' ticket.id %}" class="btn btn-secondary">
-                        {% trans "Cancel" %}
-                    </a>
+                        <button class="btn btn-primary" type='submit'>{% trans "Add Recipient" %}</button>
+                        <a href="{% url 'helpdesk:ticket_cc' ticket.id %}" class="btn btn-secondary">
+                            {% trans "Cancel" %}
+                        </a>
                     </form>
                 </div>
             </div>

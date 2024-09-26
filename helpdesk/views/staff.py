@@ -2926,11 +2926,11 @@ def ticket_cc_add(request, ticket_id):
             user = form.cleaned_data.get('user')
             email = form.cleaned_data.get('email')
             if user and ticket.ticketcc_set.filter(user=user).exists():
-                form.add_error('user', _('Impossible to add twice the same user'))
+                form.add_error('user', _('Cannot add the same user twice'))
             elif user and user.email and ticket.ticketcc_set.filter(email=user.email).exists():
-                form.add_error('user', _('Impossible to add twice the same email address'))
+                form.add_error('user', _('Cannot add the same email address twice'))
             elif email and ticket.ticketcc_set.filter(email=email).exists():
-                form.add_error('email', _('Impossible to add twice the same email address'))
+                form.add_error('email', _('Cannot add the same email address twice'))
             else:
                 ticketcc = form.save(commit=False)
                 ticketcc.ticket = ticket
