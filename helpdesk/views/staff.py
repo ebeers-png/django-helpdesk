@@ -305,7 +305,7 @@ def create_form(request):
         form = EditFormTypeForm(
             initial_customfields = CustomField.objects.filter(ticket_form=formtype),
             organization = org,
-            pk = formtype.id
+            instance = formtype
         )
 
         return render(request, 'helpdesk/edit_form.html', {
@@ -330,14 +330,15 @@ def create_form(request):
                     if not cf or cf['DELETE']: continue # continue to next item if form is empty or item is being deleted
                     del cf['DELETE']
 
+                    cf['ticket_form'] = formtype
+
                     if cf['id']:
                         customfield = cf['id']
                         del cf['id']
                         CustomField.objects.filter(id=customfield.id).update(**cf)
                     else:
-                        customfield = CustomField()
+                        customfield = CustomField(**cf)
                         customfield.save()
-                        CustomField.objects.filter(id=customfield.id).update(**cf)
                 
                 return HttpResponseRedirect(reverse('helpdesk:maintain_forms'))
             
@@ -384,14 +385,15 @@ def edit_form(request, pk):
                     if not cf or cf['DELETE']: continue # continue to next item if form is empty or item is being deleted
                     del cf['DELETE']
 
+                    cf['ticket_form'] = formtype
+
                     if cf['id']:
                         customfield = cf['id']
                         del cf['id']
                         CustomField.objects.filter(id=customfield.id).update(**cf)
                     else:
-                        customfield = CustomField()
+                        customfield = CustomField(**cf)
                         customfield.save()
-                        CustomField.objects.filter(id=customfield.id).update(**cf)
 
                 return HttpResponseRedirect(reverse('helpdesk:maintain_forms'))
 
