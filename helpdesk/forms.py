@@ -155,6 +155,8 @@ class CustomFieldMixin(object):
 
         # TODO change this
         if is_extra_data(field.field_name):
+            # TODO: move custom django form fields to separate file and add the mapping directly to CUSTOMFIELD_TO_FIELD_DICT
+            fieldclass = ClearableFileField if fieldclass == forms.FileField else fieldclass 
             self.fields['e_%s' % field.field_name] = fieldclass(**instanceargs)
         else:
             self.fields[field.field_name] = fieldclass(**instanceargs)
