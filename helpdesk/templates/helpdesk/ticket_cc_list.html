@@ -1,6 +1,6 @@
 {% extends "helpdesk/base.html" %}
 
-{% load i18n %}
+{% load i18n helpdesk_staff %}
 
 {% block helpdesk_title %}{% trans "Ticket CC Settings" %}{% endblock %}
 
@@ -37,7 +37,8 @@
                                     <th>{% trans "E-Mail Address or Helpdesk User" %}</th>
                                     <th class="text-center">{% trans "View" %}</th>
                                     <th class="text-center">{% trans "Update" %}</th>
-                                    <th class="text-center">{% trans "Delete" %}</th>
+                                    <th class="text-center">{% trans "Staff" %}</th>
+                                    <th class="text-center">{% trans "Remove" %}</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -53,6 +54,13 @@
                                         </td>
                                         <td class="text-center align-middle">
                                             {% if person.can_update %}
+                                                <i class="fa fa-check-circle text-success"></i>
+                                            {% else %}
+                                                <i class="fa fa-times-circle text-danger"></i>
+                                            {% endif %}
+                                        </td>
+                                        <td class="text-center align-middle">
+                                            {% if person.user|is_helpdesk_staff %}
                                                 <i class="fa fa-check-circle text-success"></i>
                                             {% else %}
                                                 <i class="fa fa-times-circle text-danger"></i>
