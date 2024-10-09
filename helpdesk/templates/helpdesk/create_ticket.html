@@ -1,4 +1,4 @@
-{% extends "helpdesk/base.html" %}{% load i18n bootstrap4form %}
+{% extends "helpdesk/base.html" %}{% load i18n bootstrap4form helpdesk_staff %}
 
 {% block helpdesk_title %}{% trans "Create Ticket" %}{% endblock %}
 
@@ -15,10 +15,17 @@
 {% block helpdesk_body %}
     <div class="container">
         <div class="card card-register mx-auto mt-5">
-            <div class="card-header">
+            <div class="card-header d-flex align-items-center">
                 {% blocktrans with title=form.form_title %}
                 {{ title }}
                 {% endblocktrans %}
+                {% if user|is_helpdesk_staff %}
+                <div class="flex-fill d-flex justify-content-end">
+                    <a class="btn btn-primary btn-sm float-right" href="{% url 'helpdesk:edit_form' form.form_id %}">
+                        <i class='fa fa-pen mr-2'></i>Edit
+                    </a>
+                </div>
+                {% endif %}
             </div>
             <div class="card-body" style="margin-top:-15px">
                 <p>
