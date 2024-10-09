@@ -6,12 +6,12 @@ build-backend = "setuptools.build_meta"
 packages = ["helpdesk"]
 
 [project]
-name = "helpdesk"
-version = "0.0.0"
+name = "django-helpdesk"
+version = "0.3.0b3"
 description = "Helpdesk in Django"
 authors = [{name = "Ross Poulton", email = "ross@rossp.org"}]
 maintainers = [{name = "Garret Wassermann", email = "gwasser@gmail.com"}]
-license = {text = "BDS3"}
+license = {text = "BSD-3-Clause"}
 requires-python = ">=3.7"
 readme = { file = "README.rst", content-type = "text/x-rst"}
 classifiers = [
@@ -50,4 +50,4 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/ClearlyEnergy/django-helpdesk"
+Repository = "https://github.com/ClearlyEnergy/django-helpdesk"
