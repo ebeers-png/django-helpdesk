@@ -49,7 +49,7 @@ from helpdesk.decorators import (
 )
 from helpdesk.forms import (
     TicketForm, UserSettingsForm, EmailIgnoreForm, EditTicketForm, TicketCCForm,
-    TicketCCEmailForm, TicketCCUserForm, EditFollowUpForm, TicketDependencyForm, MultipleTicketSelectForm,
+    EditFollowUpForm, TicketDependencyForm, MultipleTicketSelectForm,
     EditQueueForm, EditFormTypeForm, PreSetReplyForm, EmailTemplateForm, TagForm
 )
 from helpdesk.lib import (
@@ -2919,18 +2919,18 @@ def ticket_cc_add(request, ticket_id):
     if perm is not None:
         return perm
 
-    form = None
+    form = TicketCCForm(initial={'can_view': True, 'can_update': True})
     if request.method == 'POST':
         form = TicketCCForm(request.POST)
         if form.is_valid():
             user = form.cleaned_data.get('user')
             email = form.cleaned_data.get('email')
             if user and ticket.ticketcc_set.filter(user=user).exists():
-                form.add_error('user', _('Impossible to add twice the same user'))
+                form.add_error('user', _('Cannot add the same user twice'))
             elif user and user.email and ticket.ticketcc_set.filter(email=user.email).exists():
-                form.add_error('user', _('Impossible to add twice the same email address'))
+                form.add_error('user', _('Cannot add the same email address twice'))
             elif email and ticket.ticketcc_set.filter(email=email).exists():
-                form.add_error('email', _('Impossible to add twice the same email address'))
+                form.add_error('email', _('Cannot add the same email address twice'))
             else:
                 ticketcc = form.save(commit=False)
                 ticketcc.ticket = ticket
@@ -2939,19 +2939,16 @@ def ticket_cc_add(request, ticket_id):
                 ticketcc.save()
                 return HttpResponseRedirect(reverse('helpdesk:ticket_cc', kwargs={'ticket_id': ticket.id}))
 
-    # Add list of users to the TicketCCUserForm
+    # Add list of users to the TicketCCForm
     users = list_of_helpdesk_staff(ticket.ticket_form.organization)
     users = users.order_by('last_name', 'first_name', 'email')
 
-    form_user = TicketCCUserForm()
-    form_user.fields['user'].choices = [('', '--------')] + [
+    form.fields['user'].choices = [('', '--------')] + [
         (u.id, (u.get_full_name() or u.get_username())) for u in users]
 
     return render(request, 'helpdesk/ticket_cc_add.html', {
         'ticket': ticket,
         'form': form,
-        'form_email': TicketCCEmailForm(),
-        'form_user': form_user,
         'debug': settings.DEBUG,
     })
 

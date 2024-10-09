@@ -1306,29 +1306,6 @@ class TicketCCForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super(TicketCCForm, self).__init__(*args, **kwargs)
 
-
-class TicketCCUserForm(forms.ModelForm):
-    """ Adds a helpdesk user as a CC on a Ticket """
-
-    def __init__(self, *args, **kwargs):
-        super(TicketCCUserForm, self).__init__(*args, **kwargs)
-
-    class Meta:
-        model = TicketCC
-        exclude = ('ticket', 'email',)
-
-
-class TicketCCEmailForm(forms.ModelForm):
-    """ Adds an email address as a CC on a Ticket """
-
-    def __init__(self, *args, **kwargs):
-        super(TicketCCEmailForm, self).__init__(*args, **kwargs)
-
-    class Meta:
-        model = TicketCC
-        exclude = ('ticket', 'user',)
-
-
 class TicketDependencyForm(forms.ModelForm):
     """ Adds a different ticket as a dependency for this Ticket """
     dependency_id = forms.IntegerField(label="Or, enter a ticket ID:")
