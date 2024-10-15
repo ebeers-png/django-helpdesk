@@ -40,7 +40,7 @@ jobs:
           file: "pyproject.toml"
           key: "project.version"
           value: ${{ env.RELEASE_VERSION }}
-          
+
       - name: Set Up Python
         uses: actions/setup-python@v5
         with:
@@ -65,4 +65,4 @@ jobs:
           export TWINE_PASSWORD=`aws codeartifact get-authorization-token --domain clearlyenergy --domain-owner 870817328084 --query authorizationToken --output text`
           export TWINE_REPOSITORY_URL=`aws codeartifact get-repository-endpoint --domain clearlyenergy --domain-owner 870817328084 --repository django-helpdesk --format pypi --query repositoryEndpoint --output text`
           python3 -m build
-          twine upload -r django-helpdesk dist/*
+          twine upload dist/*
