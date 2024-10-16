@@ -28,18 +28,13 @@ jobs:
     if: needs.semantic-release.outputs.new-release-published == 'true'
     steps:
       - uses: actions/checkout@v4
-      - name: Download yq
-        run: |
-          wget -nv -nc -O yq https://github.com/mikefarah/yq/releases/download/v4.20.2/yq_linux_amd64
-          chmod +x yq
+
       - name: Update pyproject.toml version
         env:
           RELEASE_VERSION: ${{ needs.semantic-release.outputs.release-version }}
-        uses: ciiiii/toml-editor@1.0.0
-        with:
-          file: "pyproject.toml"
-          key: "project.version"
-          value: ${{ env.RELEASE_VERSION }}
+        run: |
+            pip install toml-cli
+            toml set --toml-path pyproject.toml project.version ${{ env.RELEASE_VERSION }}
 
       - name: Set Up Python
         uses: actions/setup-python@v5
