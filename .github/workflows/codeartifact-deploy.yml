@@ -24,6 +24,9 @@ jobs:
 
   release:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
     needs: semantic-release
     if: needs.semantic-release.outputs.new-release-published == 'true'
     steps:
