@@ -579,12 +579,16 @@ def google_sync(importer, queues, logger, server, debugging, options=None):
 
 def decode_unknown(charset, string):
     if type(string) is not str:
-        if not charset:
+        if charset:
             try:
-                return str(string, encoding='utf-8', errors='replace')
-            except UnicodeError:
-                return str(string, encoding='iso8859-1', errors='replace')
-        return str(string, encoding=charset, errors='replace')
+                return str(string, encoding=charset, errors='replace')
+            except LookupError:
+                # email gave a charset that is not supported by Python (such as windows-874)
+                pass
+        try:
+            return str(string, encoding='utf-8', errors='replace')
+        except UnicodeError:
+            return str(string, encoding='iso8859-1', errors='replace')
     return string
 
 
