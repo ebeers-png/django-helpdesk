@@ -957,7 +957,7 @@ def process_message(message, importer, queues, logger, options=None):
     for ignored_address in IgnoreEmail.objects.filter(Q(queues=queue) | Q(organization=queue.organization, queues__isnull=True), ignore_import=True):
         if ignored_address.test(sender[1]):
             logger.info("Email address matched an ignored address. Ticket will not be created")
-            if ignored_address.keep_in_mailbox:
+            if ignored_address.keep_in_mailbox and not importer.keep_mail:
                 return False  # By returning 'False' the message will be kept in the mailbox,
             return True  # and the 'True' will cause the message to be deleted.
 
@@ -1189,7 +1189,7 @@ def process_exchange_message(message, importer, queues, logger):
     for ignored_address in IgnoreEmail.objects.filter(Q(queues=queue) | Q(organization=queue.organization, queues__isnull=True), ignore_import=True):
         if ignored_address.test(sender[1]):
             logger.info("Email address matched an ignored address. Ticket will not be created")
-            if ignored_address.keep_in_mailbox:
+            if ignored_address.keep_in_mailbox and not importer.keep_mail:
                 return False  # By returning 'False' the message will be kept in the mailbox,
             return True  # and the 'True' will cause the message to be deleted.
 
@@ -1444,7 +1444,7 @@ def process_google_message(message, importer, queues, logger, msg_id, server):
     for ignored_address in IgnoreEmail.objects.filter(Q(queues=queue) | Q(organization=queue.organization, queues__isnull=True), ignore_import=True):
         if ignored_address.test(sender[1]):
             logger.info("Email address matched an ignored address. Ticket will not be created")
-            if ignored_address.keep_in_mailbox:
+            if ignored_address.keep_in_mailbox and not importer.keep_mail:
                 return False  # By returning 'False' the message will be kept in the mailbox,
             return True  # and the 'True' will cause the message to be deleted.
 
