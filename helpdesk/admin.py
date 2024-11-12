@@ -3,7 +3,7 @@ from django import forms
 from django.utils.translation import ugettext_lazy as _
 from django.utils.html import format_html
 from helpdesk.models import (
-    Queue, Ticket, FollowUp, TimeSpent, PreSetReply, KBCategory, EscalationExclusion, EmailTemplate, KBItem, TicketChange,
+    DependsOn, Queue, Ticket, FollowUp, TimeSpent, PreSetReply, KBCategory, EscalationExclusion, EmailTemplate, KBItem, TicketChange,
     KBIAttachment, FollowUpAttachment, IgnoreEmail, CustomField, FormType, is_extra_data)
 from seed.models import Column, Property, TaxLot
 from seed.lib.superperms.orgs.models import get_helpdesk_organizations
@@ -76,6 +76,31 @@ class TicketAdmin(admin.ModelAdmin):
     hidden_submitter_email.short_description = _('Submitter E-Mail')
 
 
+class DependsOnAdminForm(forms.ModelForm):
+    class Meta:
+        model = DependsOn
+        fields = '__all__'
+
+
+class DependsOnInline(admin.StackedInline):
+    model = DependsOn
+    fk_name = 'dependent'
+    extra = 0
+    form = DependsOnAdminForm
+
+    def get_formset(self, request, obj=None, **kwargs):
+        self.dependent_obj = obj
+        if self.dependent_obj and self.dependent_obj.ticket_form:
+            self.related_objs = self.dependent_obj.ticket_form.customfield_set.all().exclude(id=self.dependent_obj.id)
+
+        return super().get_formset(request, obj, **kwargs)
+
+    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        if db_field.name == 'parent':
+            kwargs['queryset'] = getattr(self, 'related_objs', CustomField.objects.none())
+        return super().formfield_for_foreignkey(db_field, request, **kwargs)
+
+
 class CustomFieldAdminForm(forms.ModelForm):
     # Overrides admin form for CustomField to add filtering for column's queryset.
     class Meta:
@@ -102,6 +127,7 @@ class CustomFieldAdmin(admin.ModelAdmin):
                     'required', 'staff', 'public', 'is_extra_data',)
     list_filter = ('ticket_form__organization', 'ticket_form',)
     list_display_links = ('field_name',)
+    inlines = [DependsOnInline]
 
     def ticket_form_type(self, field):
         if field.ticket_form:

@@ -383,7 +383,7 @@ class FormType(models.Model):
     name = models.CharField(max_length=255, null=True)
     description = models.TextField(blank=True, null=True,
                                    help_text=_("Introduction text included in the form.<br/><br/>" + markdown_allowed()),)
-    
+
     queue = models.ForeignKey(Queue, on_delete=models.SET_NULL, null=True, blank=True,
                               help_text=_('If a queue is selected, tickets will automatically be added to this queue when submitted. '
                                           'This option will hide the Queue field on the form.'))
@@ -1077,7 +1077,7 @@ class TimeSpent(models.Model):
             return self.stop_time - self.start_time
         else:
             return None
-    
+
     @property
     def time_spent_formatted(self):
         return format_time_spent(self.get_time_spent)
@@ -1548,7 +1548,7 @@ class KBItem(models.Model):
                     '&amp;nbsp;<br/>Body of subsection.<br/>&amp;nbsp;<br/>I can add many lines of text to this. '
                     "It will all be included in the section.<br/>~!~<br/><br/>"
                     "&amp;nbsp;<br/>This, however, won't be included in the collapsing section.</pre>"
-                    "<b>Anchor links:</b></br>Add <code>{: #name }</code> on the same line after a header, or on the line " 
+                    "<b>Anchor links:</b></br>Add <code>{: #name }</code> on the same line after a header, or on the line "
                     "after a paragraph to create an anchor. Use <code>[Link Text](#name)</code> to create a link "
                     "that will jump to the anchor. "
                     "Name can have letters, numbers, and underscores - no spaces. "
@@ -1674,7 +1674,7 @@ class KBItem(models.Model):
             def __call__(self, match):
                     self.count += 1
                     return self.pattern.format(self.count)
-            
+
         anchor_target_pattern = r'{\:\s*#(\w+)\s*}'
         anchor_link_pattern = r'\[(.+)\]\(#(\w+)\)'
         new_answer, anchor_target_count = re.subn(anchor_target_pattern, "{: #anchor-\g<1> }", self.answer)
@@ -2201,6 +2201,21 @@ class CustomField(models.Model):
 
     def get_markdown(self):
         return get_markdown(self.help_text, self.ticket_form.organization)
+
+class DependsOn(models.Model):
+    parent = models.ForeignKey(CustomField, blank=True, null=True, on_delete=models.CASCADE, related_name='parent_fields')
+    dependent = models.ForeignKey(CustomField, blank=True, null=True, on_delete=models.CASCADE, related_name='dependent_fields')
+    parent_alert_text = models.TextField(
+        _('Parent Alert Text'),
+        help_text=_('Shown to the User in the Parent CustomField when it has a specific value'),
+        blank=True,
+        null=True
+    )
+    value = models.TextField(
+        _('Comparison Value'),
+        blank=True,
+        null=True,
+    )
 
 
 class TicketCustomFieldValue(models.Model):
