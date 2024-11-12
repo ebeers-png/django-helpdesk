@@ -58,7 +58,7 @@ from helpdesk.lib import (
     queue_template_context,
 )
 from helpdesk.models import (
-    Ticket, Queue, FollowUp, TimeSpent, TicketChange, PreSetReply, FollowUpAttachment, SavedSearch,
+    DependsOn, Ticket, Queue, FollowUp, TimeSpent, TicketChange, PreSetReply, FollowUpAttachment, SavedSearch,
     IgnoreEmail, TicketCC, TicketDependency, UserSettings, KBItem, CustomField, is_unlisted,
     FormType, EmailTemplate, get_markdown, clean_html, Tag
 )
@@ -239,8 +239,8 @@ def create_queue(request):
             return HttpResponseRedirect(reverse('helpdesk:maintain_queues'))
 
         redo_form = EditQueueForm(
-            "create", 
-            request.POST, 
+            "create",
+            request.POST,
             organization=org.id,
             initial = {  # todo remove hard coding
                 'title': form.cleaned_data['title'],
@@ -326,7 +326,7 @@ def edit_queue(request, slug):
 def form_list(request):
     org = request.user.default_organization.helpdesk_organization
     form_list = FormType.objects.filter(organization=org)
-    
+
     # user settings num tickets per page
     if request.user.is_authenticated and hasattr(request.user, 'usersettings_helpdesk'):
         forms_per_page = request.user.usersettings_helpdesk.tickets_per_page
@@ -352,7 +352,7 @@ def form_list(request):
 @helpdesk_staff_member_required
 def create_form(request):
     org = request.user.default_organization.helpdesk_organization
-    
+
     if request.method == "GET":
         # Create empty form and save it to the database to generate the default Custom Fields.
         formtype = FormType(organization = org, name="Unnamed Form")
@@ -391,7 +391,7 @@ def create_form(request):
             formtype.public = form.cleaned_data['public']
             formtype.staff = form.cleaned_data['staff']
             formtype.unlisted = form.cleaned_data['unlisted']
-            formtype.save() 
+            formtype.save()
 
             if formset.is_valid():
                 for df in formset.deleted_forms:
@@ -421,39 +421,39 @@ def create_form(request):
                     customfield.modified = datetime.now()
                     customfield.ticket_form = formtype
                     customfield.save()
-                
+
                 return HttpResponseRedirect(reverse('helpdesk:maintain_forms'))
-            
+
         form.customfield_formset = formset
         return render(request, "helpdesk/edit_form.html", {
             'formtype': formtype,
             'form': form,
             'formset': formset,
             'action': "Create",
-            'debug': settings.DEBUG,             
+            'debug': settings.DEBUG,
         })
-    
+
 
 @helpdesk_staff_member_required
 def edit_form(request, pk):
     formtype = get_object_or_404(FormType, pk=pk)
-    
+
     if request.method == "GET":
         form = EditFormTypeForm(
-            initial = {
+            initial={
                 'id': formtype.id,  # todo remove hard coding
                 'name': formtype.name,
                 'description': formtype.description,
                 'queue': formtype.queue,
                 'public': formtype.public,
                 'staff': formtype.staff,
-                'unlisted': formtype.unlisted
+                'unlisted': formtype.unlisted,
             },
-            initial_customfields = CustomField.objects.filter(ticket_form=formtype),
-            organization = formtype.organization,
-            pk = pk
+            initial_customfields=CustomField.objects.filter(ticket_form=formtype).prefetch_related('dependent_fields'),
+            organization=formtype.organization,
+            pk=pk,
         )
-        
+
         return render(request, 'helpdesk/edit_form.html', {
             'formtype': formtype,
             'form': form,
@@ -461,7 +461,7 @@ def edit_form(request, pk):
             'debug': settings.DEBUG,
         })
     elif request.method == "POST":
-        form = EditFormTypeForm(request.POST, organization = formtype.organization)
+        form = EditFormTypeForm(request.POST, organization=formtype.organization)
         formset = form.CustomFieldFormSet(request.POST)
 
         if form.is_valid():
@@ -472,14 +472,16 @@ def edit_form(request, pk):
             formtype.public = form.cleaned_data['public']
             formtype.staff = form.cleaned_data['staff']
             formtype.unlisted = form.cleaned_data['unlisted']
-            formtype.save() 
-            
+            formtype.save()
+
             if formset.is_valid():
                 for df in formset.deleted_forms:
                     if df.cleaned_data['id']: df.cleaned_data['id'].delete()
 
-                for cf in formset.cleaned_data:
-                    if not cf or cf['DELETE']: continue # continue to next item if form is empty or item is being deleted
+                for cf_indx, cf in enumerate(formset.cleaned_data):
+                    if not cf or cf['DELETE']:
+                        # continue to next item if form is empty or item is being deleted
+                        continue
 
                     customfield = cf['id'] if cf['id'] else CustomField()  # todo remove hard coding
                     customfield.field_name = cf['field_name']
@@ -502,6 +504,25 @@ def edit_form(request, pk):
                     customfield.ticket_form = formtype
                     customfield.save()
 
+                    # Handle dependent fields
+                    sub_formset_post = form.DependsOnFormSet.clean_post_data(cf_indx, request.POST)
+                    sub_formset = form.DependsOnFormSet(sub_formset_post, instance=customfield)
+
+                    if sub_formset.is_valid():
+                        for sub_df in sub_formset.deleted_forms:
+                            if sub_df.cleaned_data['id']: sub_df.cleaned_data['id'].delete()
+
+                        for dependent_field_form in sub_formset.cleaned_data:
+                            if not dependent_field_form or dependent_field_form['DELETE']:
+                                continue
+
+                            depends_on = dependent_field_form['id'] if dependent_field_form['id'] else DependsOn()
+                            depends_on.parent = dependent_field_form['parent']
+                            depends_on.dependent = dependent_field_form['dependent']
+                            depends_on.parent_alert_text = dependent_field_form['parent_alert_text']
+                            depends_on.value = dependent_field_form['value']
+                            depends_on.save()
+
                 return HttpResponseRedirect(reverse('helpdesk:maintain_forms'))
 
         form.customfield_formset = formset
@@ -510,7 +531,7 @@ def edit_form(request, pk):
             'form': form,
             'formset': formset,
             'action': "Edit",
-            'debug': settings.DEBUG,             
+            'debug': settings.DEBUG,
         })
 
 
@@ -536,7 +557,7 @@ def duplicate_form(request, pk):
         updated = datetime.now(),
     )
     new_form.save() # generate default custom fields
-    
+
     for cf_name in formtype.get_extra_field_names():
         cf = CustomField.objects.get(ticket_form=formtype, field_name=cf_name)
         new_cf = CustomField(  # todo remove hard coding
@@ -573,7 +594,7 @@ def copy_field(request):
         cf = form.cleaned_data
         target_form = FormType.objects.get(id=form_id)
         base = cf['field_name'] + '_copy'
-        
+
         high = CustomField.objects.filter(ticket_form=target_form, field_name__regex=(base + r'(\d+)')).order_by('field_name').last()
         if high != None: # if copies exist, use the index after the highest to ensure availability
             import re
@@ -831,7 +852,7 @@ def followup_edit(request, ticket_id, followup_id):
             new_followup = FollowUp(title=title, date=old_date, ticket=_ticket,
                                     comment=comment, public=public,
                                     new_status=new_status,)
-            
+
             # keep old user if one did exist before.
             if followup.user:
                 new_followup.user = followup.user
@@ -1975,7 +1996,7 @@ def ticket_list(request):
             ('form', 'ticket_form__name__icontains'),
             ('status', 'status__icontains'), # need to search words not numbers
             ('assigned_to', 'assigned_to__username__icontains'), # currently only checks this one
-            ('assigned_to', 'assigned_to__email__icontains'), 
+            ('assigned_to', 'assigned_to__email__icontains'),
             ('submitter', 'submitter_email__icontains'),
             ('paired_count', 'paired_count__icontains'), # this needs to be updated once I figure out how to filter on paired_count
             ('created', 'created__icontains'),
@@ -1984,7 +2005,7 @@ def ticket_list(request):
             # ('time_spent', 'status__icontains'), # this needs to be updated once I figure out how to filter on time_spent
             ('kbitem', 'kbitem__title__icontains'),
         ])
-        
+
         # breakpoint()
         for item in request.POST.items():
             if item[0].endswith('_filter') and item[1] != '':
@@ -2420,16 +2441,16 @@ def run_report(request, report):
             metric3 = ticket.modified - ticket.created
             metric3 = metric3.days
 
-        if (metric1, metric2) in summarytable: 
+        if (metric1, metric2) in summarytable:
             summarytable[metric1, metric2] += 1
-        else: 
+        else:
             summarytable[metric1, metric2] = 1
 
         if metric3:
             if report == 'daysuntilticketclosedbymonth':
-                if (metric1, metric2) in summarytable2: 
+                if (metric1, metric2) in summarytable2:
                     summarytable2[metric1, metric2] += metric3
-                else: 
+                else:
                     summarytable2[metric1, metric2] = metric3
 
     table = []
@@ -2437,7 +2458,7 @@ def run_report(request, report):
     if report == 'daysuntilticketclosedbymonth':
         for key in summarytable2.keys():
             summarytable[key] = round(summarytable2[key] / summarytable[key], 1)
-            if float(summarytable[key]) == int(summarytable[key]): 
+            if float(summarytable[key]) == int(summarytable[key]):
                 summarytable[key] = int(summarytable[key])
 
     header1 = sorted(set(list(i for i, _ in summarytable.keys())))

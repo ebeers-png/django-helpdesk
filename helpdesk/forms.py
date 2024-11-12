@@ -22,7 +22,7 @@ from django.utils import timezone
 from django.shortcuts import get_object_or_404
 
 from helpdesk.lib import safe_template_context, process_attachments
-from helpdesk.models import (Ticket, Queue, FollowUp, IgnoreEmail, TicketCC,
+from helpdesk.models import (DependsOn, Ticket, Queue, FollowUp, IgnoreEmail, TicketCC,
                              CustomField, TicketDependency, UserSettings, KBItem, Tag,
                              FormType, KBCategory, KBIAttachment, is_extra_data, PreSetReply, EmailTemplate, clean_html)
 from helpdesk import settings as helpdesk_settings
@@ -309,7 +309,7 @@ class EditKBCategoryForm(forms.ModelForm):
 
     def __init__(self, action, *args, **kwargs):
         """
-            Set slug field to read-only. 
+            Set slug field to read-only.
             Filter queues and forms by current org.
         """
         org = kwargs.pop('organization', None)
@@ -500,14 +500,14 @@ class EditQueueForm(forms.ModelForm):
         if kwargs and kwargs['initial']:
             self.fields['match_on'] = MatchOnField(
                 num_widgets=len(kwargs['initial']['match_on']) + 1,
-                field_type=forms.CharField(), widget_type=forms.TextInput(), 
+                field_type=forms.CharField(), widget_type=forms.TextInput(),
                 required=False,
                 label=Queue.match_on.field.verbose_name,
                 help_text=Queue.match_on.field.help_text
             )
             self.fields['match_on_addresses'] = MatchOnField(
-                num_widgets=len(kwargs['initial']['match_on_addresses']) + 1, 
-                field_type=forms.EmailField(), widget_type=forms.EmailInput(), 
+                num_widgets=len(kwargs['initial']['match_on_addresses']) + 1,
+                field_type=forms.EmailField(), widget_type=forms.EmailInput(),
                 required=False,
                 label=Queue.match_on_addresses.field.verbose_name,
                 help_text=Queue.match_on_addresses.field.help_text
@@ -518,7 +518,7 @@ class EditQueueForm(forms.ModelForm):
 
         if cleaned_data['importer'] == '':
             cleaned_data['importer'] = None
-        # Since organization is an excluded field, validating the unique_together 
+        # Since organization is an excluded field, validating the unique_together
         # constraint of slugs must be done manually
         if 'slug' in cleaned_data and Queue.objects.filter(organization=self.org, slug=cleaned_data['slug']).exists():
             raise ValidationError({'slug': ["Queue with this slug already exists in this organization"]})
@@ -565,20 +565,68 @@ class EditFormTypeForm(forms.ModelForm):
         widgets={'help_text': PreviewWidget}
     )
 
+    class BaseDependsOnFormSet(forms.BaseInlineFormSet):
+        class ParentModelChoiceField(forms.ModelChoiceField):
+            widget = forms.Select
+
+            def label_from_instance(self, custom_field):
+                return custom_field.label if custom_field.label else custom_field.field_name
+
+        def clean(self):
+            print(self.data)
+            super().clean()
+            print(self.cleaned_data)
+
+        @staticmethod
+        def clean_post_data(indx, post_data):
+            sub_formset_post = {}
+            for k, v in post_data.items():
+                if f'customfield{indx}dependentfields' in k and '__prefix__' not in k:
+                    new_key = k.replace('dependentfields', 'dependent_fields').replace('_set', '')
+                    new_key = new_key[new_key.index('dependent_fields'):]
+                    sub_formset_post[new_key] = v
+            return sub_formset_post
+
+    DependsOnFormSet = forms.inlineformset_factory(CustomField, DependsOn, formset=BaseDependsOnFormSet,
+        fields=['id', 'parent', 'dependent', 'parent_alert_text', 'value'],
+        fk_name='dependent',
+    )
+
+    def _initialize_depends_on(self, form_indx, initial, queryset):
+        depends_on = self.DependsOnFormSet(prefix=f'customfield{form_indx}dependentfields_set')
+        depends_on.extra = len(initial)
+        depends_on.initial = initial
+        depends_on.formset_type = f'customfield_{form_indx}_dependent_fields'
+        parent_field = EditFormTypeForm.BaseDependsOnFormSet.ParentModelChoiceField(queryset=queryset)
+        prefix = f'customfield{form_indx}dependentfields_set-'
+        for depends_on_index, form_depends_on in enumerate(depends_on.forms):
+            form_depends_on.fields['parent'] = parent_field
+            form_depends_on.fields['parent_alert_text'].widget.attrs['style'] = 'height:40px'
+            form_depends_on.fields['value'].widget.attrs['style'] = 'height:40px'
+            form_depends_on.prefix = f'{prefix}{depends_on_index}'
+
+        form_empty = depends_on.empty_form
+        form_empty.fields['parent'] = parent_field
+        form_empty.fields['parent_alert_text'].widget.attrs['style'] = 'height:40px'
+        form_empty.fields['value'].widget.attrs['style'] = 'height:40px'
+        form_empty.prefix = f'{prefix}__prefix__'
+        return depends_on, form_empty
+
+
     class Meta:
         model = FormType
         exclude = ('organization', 'created', 'updated',)
 
     def __init__(self, *args, **kwargs):
         """
-            Set up formset for CustomField objects 
+        Set up formset for CustomField objects
         """
         self.org = kwargs.pop('organization', None)
         self.pk = kwargs.pop('pk', None)
         # self.ticket_form = kwargs.pop('ticket_form', None)
         initial_customfields_objs = kwargs.pop('initial_customfields', None)
 
-        super(EditFormTypeForm, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
         self.fields['queue'].queryset = Queue.objects.filter(organization = self.org)
         column_queryset = Column.objects \
@@ -594,6 +642,7 @@ class EditFormTypeForm(forms.ModelForm):
         if initial_customfields_objs:
             initial_customfields = []
             list_val_lens = []
+            initial_depends_on = {}
             for cf in initial_customfields_objs:
                 initial_customfields.append({
                     'id': cf.id,
@@ -613,7 +662,15 @@ class EditFormTypeForm(forms.ModelForm):
                     'column': cf.column,
                     'lookup': cf.lookup,
                 })
-                if cf.list_values: 
+                if cf.dependent_fields.count():
+                    initial_depends_on[cf.id] = [{
+                        'id': dcf.id,
+                        'parent': dcf.parent,
+                        'dependent': cf.id,
+                        'parent_alert_text': dcf.parent_alert_text,
+                        'value': dcf.value
+                    } for dcf in cf.dependent_fields.all()]
+                if cf.list_values:
                     list_val_lens.append(len(cf.list_values))
                 else:
                     list_val_lens.append(0)
@@ -622,23 +679,29 @@ class EditFormTypeForm(forms.ModelForm):
             self.customfield_formset.initial = initial_customfields
 
             defaults = ['queue','submitter_email', 'contact_name', 'contact_email', 'title','description','building_name','building_address','building_id','pm_id','attachment','due_date','priority','cc_emails', 'empty']
-            
+
             self.form_empty = self.customfield_formset.empty_form
             self.form_empty.fields['column'] = EditFormTypeForm.BaseCustomFieldFormSet.ColumnModelChoiceField(queryset=column_queryset)
             self.form_empty.fields['agg_list_values'] = forms.JSONField(widget=forms.HiddenInput(), required=False)
             self.form_empty.fields['list_values'] = MatchOnField(num_widgets=1, field_type=forms.CharField(), widget_type=forms.TextInput(), required=False)
-            i = 0
-            for form in self.customfield_formset.forms:
+            self.form_empty.depends_on = self.DependsOnFormSet()
+            self.form_empty.form_empty = self.form_empty.depends_on.empty_form
+
+            for form_indx, form in enumerate(self.customfield_formset.forms):
                 form.fields['column'] = EditFormTypeForm.BaseCustomFieldFormSet.ColumnModelChoiceField(queryset=column_queryset)
                 form.fields['agg_list_values'] = forms.JSONField(widget=forms.HiddenInput(), required=False)
-                form.fields['list_values'] = MatchOnField(num_widgets=list_val_lens[i] + 1, field_type=forms.CharField(), widget_type=forms.TextInput(), required=False)
+                form.fields['list_values'] = MatchOnField(num_widgets=list_val_lens[form_indx] + 1, field_type=forms.CharField(), widget_type=forms.TextInput(), required=False)
+
+                initial = initial_depends_on.get(form.initial['id'], [])
+                depends_on_parent_queryset = initial_customfields_objs.exclude(id=form.initial['id'])
+                form.depends_on, form.form_empty = self._initialize_depends_on(form_indx, initial, depends_on_parent_queryset)
+
                 if form.initial and form.initial['field_name'] in defaults:
                     form.fields['field_name'].widget.attrs = {'readonly': True}
                     if form.initial['data_type'] in ['varchar', 'text']:
                         form.fields['data_type'].choices = (('varchar', _('Character (single line)')), ('text', _('Text (multi-line)')))
                     else:
                         form.fields['data_type'].widget.attrs = {'readonly': True, 'style': 'pointer-events: none;'}
-                i += 1
 
         if args:
             self.CustomFieldFormSet.extra = int(args[0]['customfield_set-TOTAL_FORMS'])
