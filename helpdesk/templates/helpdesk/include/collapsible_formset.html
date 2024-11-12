@@ -3,7 +3,7 @@
 {% comment "Settings" %}
     formset [req]: (formset) - formset object
     formset_title [req]: (string) - title to represent the contents of the formset
-    formset_type [req]: (string) - all lowercase, underscore instead of whitespace slug used to encode the formset 
+    formset_type [req]: (string) - all lowercase, underscore instead of whitespace slug used to encode the formset
     required_fields [req]: (string array)
     can_copy: (True | False) - show the copy to dropdown
     copy_queryset: (queryset) - items to copy to
@@ -14,13 +14,13 @@
 
 <div class="card shadow-sm mb-2">
     <div class="card-header">
-        <h4 class="card-title mb-0">Edit {{formset_title}}s</h4>
+        <h4 class="card-title mb-0">Edit {{ formset_title }}s</h4>
     </div>
     <div class="card-body">
         <div id="{{ formset_type }}_formset">
             {{ formset.management_form }}
             {% for form in formset %}
-            <div id="{{formset_type}}_{{ forloop.counter0 }}" class="card">
+            <div id="{{ formset_type }}_{{ forloop.counter0 }}" class="card">
                 <div class="card-header" id="heading_{{ formset_type }}_{{ forloop.counter0 }}">
                     <div class="d-flex">
                         <h5 class="mb-0 flex-fill mr-2">
@@ -41,14 +41,14 @@
                                     </button>
                                     <div class="dropdown-menu p-2">
                                         {% for formtype in copy_queryset %}
-                                        <a class="dropdown-item rounded-lg" onclick="copyTo('{{formset_type}}_{{ forloop.parentloop.counter0 }}', this, {{formtype.id}})">{{formtype.name}}</a>
+                                        <a class="dropdown-item rounded-lg" onclick="copyTo('{{ formset_type}}_{{ forloop.parentloop.counter0 }}', this, {{ formtype.id }})">{{ formtype.name }}</a>
                                         {% endfor %}
                                     </div>
                                 </div>
                                 {% endif %}
                                 {% if can_duplicate %}
-                                <button type="button" id="duplicate_{{ formset_type }}_{{ forloop.counter0 }}" class="btn btn-outline-secondary" 
-                                    onclick="duplicateForm('{{formset_type}}_{{ forloop.counter0 }}')" data-toggle="tooltip" title="Create a copy of this {{ formset_title }} inside this form.">
+                                <button type="button" id="duplicate_{{ formset_type }}_{{ forloop.counter0 }}" class="btn btn-outline-secondary"
+                                    onclick="duplicateForm('{{ formset_type }}', _{{ forloop.counter0 }}', {{ required_fields }})" data-toggle="tooltip" title="Create a copy of this {{ formset_title }} inside this form.">
                                     <i class="fa fa-clone"></i>
                                     <span>Duplicate</span>
                                 </button>
@@ -58,7 +58,7 @@
                             <div class="btn-group-toggle" data-toggle="buttons">
                                 <label id="delete_{{ formset_type }}_{{ forloop.counter0 }}" class="btn btn-outline-danger ml-2">
                                     <i class="fa fa-trash"></i>
-                                    <input type="checkbox" autocomplete="off" onchange="deleteForm('{{ formset_type }}_{{ forloop.counter0 }}')">
+                                    <input type="checkbox" autocomplete="off" onchange="deleteForm('{{ formset_type }}', '_{{ forloop.counter0 }}', '{{ can_copy }}', '{{ can_duplicate }}', {{ required_fields }})">
                                     <span>Delete</span>
                                 </label>
                             </div>
@@ -69,11 +69,14 @@
                 <div id="collapse_{{ formset_type }}_{{ forloop.counter0 }}" class="collapse" data-parent="#{{ formset_type }}_formset">
                     <div class="card-body">
                         {{ form|bootstrap4form }}
+                        {% if  has_sub_formset %}
+                        {% include 'helpdesk/include/collapsible_formset.html' with formset=form.depends_on form_empty=form.form_empty has_sub_formset=False formset_title="Dependent Field" formset_type=form.depends_on.formset_type required_fields="['parent', 'value']" can_copy=False can_duplicate=False header_template='helpdesk/include/header_customfields.html' only %}
+                        {% endif %}
                     </div>
                 </div>
             </div>
             {% endfor %}
-            <div id="{{formset_type}}_empty" hidden class="card">
+            <div id="{{ formset_type }}_empty" hidden class="card">
                 <div class="card-header" id="heading_{{ formset_type }}_empty">
                     <div class="d-flex">
                         <h5 class="mb-0">
@@ -91,14 +94,14 @@
                                     </button>
                                     <div class="dropdown-menu p-2">
                                         {% for formtype in copy_queryset %}
-                                        <a class="dropdown-item rounded-lg" onclick="copyTo('{{formset_type}}_empty', this, {{formtype.id}})">{{formtype.name}}</a>
+                                        <a class="dropdown-item rounded-lg" onclick="copyTo('{{ formset_type }}_empty', this, {{ formtype.id }})">{{ formtype.name }}</a>
                                         {% endfor %}
                                     </div>
                                 </div>
                                 {% endif %}
                                 {% if can_duplicate %}
                                 <button type="button" id="duplicate_{{ formset_type }}_empty" class="btn btn-outline-secondary"
-                                    onclick="duplicateForm('{{formset_type}}_empty')" data-toggle="tooltip" title="Create a copy of this {{ formset_title }} inside this form.">
+                                    onclick="duplicateForm('{{ formset_type }}', '_empty', {{ required_fields }})" data-toggle="tooltip" title="Create a copy of this {{ formset_title }} inside this form.">
                                     <i class="fa fa-clone"></i>
                                     <span>Duplicate</span>
                                 </button>
@@ -108,7 +111,7 @@
                             <div class="btn-group-toggle" data-toggle="buttons">
                                 <label id="delete_{{ formset_type }}_empty" class="btn btn-outline-danger ml-2">
                                     <i class="fa fa-trash"></i>
-                                    <input type="checkbox" autocomplete="off" onchange="deleteForm('{{ formset_type }}_empty')">
+                                    <input type="checkbox" autocomplete="off" onchange="deleteForm('{{ formset_type }}', '_empty', '{{ can_copy }}', '{{ can_duplicate }}', {{ required_fields }})">
                                     <span>Delete</span>
                                 </label>
                             </div>
@@ -118,7 +121,7 @@
                 </div>
                 <div id="collapse_{{ formset_type }}_empty" class="collapse" data-parent="#{{ formset_type }}_formset">
                     <div class="card-body">
-                        {{ form.form_empty|bootstrap4form }}
+                        {{ form_empty|bootstrap4form }}
                     </div>
                 </div>
             </div>
@@ -132,7 +135,7 @@
             Improperly filled-out {{ formset_title }}s that are not set to be deleted may prevent you from saving your changes.
         </small>
         <div class="flex-fill justify-content-end">
-            <button id="add_{{ formset_type }}" type="button" class="btn btn-primary float-right" onclick="addForm()">
+                <button id="add_{{ formset_type }}" type="button" class="btn btn-primary float-right" onclick="addForm('{{ formset_type }}', {{ required_fields}})">
                 <i class="fa fa-plus"></i> Add
             </button>
         </div>
@@ -141,37 +144,38 @@
 </div>
 
 <script type='text/javascript' language='javascript'>
-    name_formset = "{{formset_type}}".replaceAll("_", "") + "_set";
-    id_formset = 'id_' + name_formset;
-    requiredFields = {{ required_fields }}
-    
-    $(document).ready(function() {    
+    $(document).ready(function() {
+        // can't abstract these out to subfunctions qwq
+        var id_formset = 'id_' + "{{ formset_type }}".replaceAll("_", "") + "_set";
         // Visually hide the default django delete checkboxes without removing their functionality
         for (const delete_checkbox of document.querySelectorAll('[id^=' + id_formset + '-][id$="-DELETE"]')) {
             delete_checkbox.parentElement.parentElement.hidden = true;
         }
-        
+
         // If invalid field is in a collapsed section, show the section
         document.querySelector('#{{ formset_type }}_formset').addEventListener("invalid", (e) => {
             formNum = e.srcElement.id.match(new RegExp(`${id_formset}-(\\d+)`))[1]
-            if (!($('#collapse_{{formset_type}}_' + formNum).hasClass("show"))) {
-                document.getElementById('button_{{formset_type}}_' + formNum).click()
+            if (!($('#collapse_{{ formset_type }}_' + formNum).hasClass("show"))) {
+                document.getElementById('button_{{ formset_type }}_' + formNum).click()
             }
         }, true);
     })
 
-    function addForm(src='{{ formset_type }}_empty') {
+    function addForm(formset_type, required_fields=[]) {
+        var src = formset_type + '_empty';
         newForm = document.getElementById(src).cloneNode(true);
-        formCount = $('[name$="TOTAL_FORMS"]').val();
-        
+        var name_formset = formset_type.replaceAll("_", "") + "_set";
+        formCount = $('[name$=' + name_formset + '-TOTAL_FORMS]').val();
+
         // Update form counters
-        newForm.innerHTML = newForm.innerHTML.replaceAll(/{{ formset_type }}_(?!formset)(\w+)/g, `{{ formset_type }}_${formCount}`);
+        var re = new RegExp(String.raw`${formset_type}_(?!formset)(\w+)`, "g");
+        newForm.innerHTML = newForm.innerHTML.replaceAll(re, formset_type + `_${formCount}`);
         newForm.innerHTML = newForm.innerHTML.replaceAll(/(\w+_set)-(\w+)-/g, `$1-${formCount}-`);
-        newForm.id = "{{ formset_type }}_" + formCount;
-        $('[name$="TOTAL_FORMS"]').val(++formCount);
+        newForm.id = formset_type + "_" + formCount;
+        $('[name$=' + name_formset + '-TOTAL_FORMS]').val(++formCount);
 
         newForm.hidden = false;
-        for (const required_field of requiredFields) {
+        for (const required_field of required_fields) {
             req = newForm.querySelector('[id$=-' + required_field + ']')
             req.required = true;
             label = newForm.querySelector('label[for=' + req.id + ']')
@@ -180,7 +184,7 @@
             }
         }
 
-        newForm = document.getElementById("{{ formset_type }}_empty").insertAdjacentElement('beforebegin', newForm)
+        newForm = document.getElementById(formset_type + "_empty").insertAdjacentElement('beforebegin', newForm)
         if (!newForm.querySelector('[id^=collapse_]').classList.contains('show')) { // Show form if hidden
             newForm.querySelector('[id^=button_]').click()
         } else {
@@ -188,12 +192,16 @@
         }
 
         // if additional scripting for adding is specified
-        if (typeof addScript === "function") { addScript(newForm) }
+        var id_formset = 'id_' + formset_type.replaceAll("_", "") + "_set";
+        if (typeof addScript === "function") { addScript(id_formset, newForm) }
         return newForm
     }
-        
-    function deleteForm(id) {
-        formNum = id.match(/{{ formset_type }}_(\d+)/)[1]
+
+    function deleteForm(formset_type, suffix, can_copy, can_duplicate, required_fields) {
+        var id = formset_type + suffix;
+        var re = new RegExp(String.raw`${formset_type}_(\d+)`);
+        formNum = id.match(re)[1]
+        var id_formset = 'id_' + formset_type.replaceAll("_", "") + "_set";
 
         if ($('#delete_' + id).hasClass('active')) { {# Toggle deletion #}
             if ($('#collapse_' + id).hasClass('show')) { // Hide form if showing
@@ -203,43 +211,44 @@
             button.disabled = true;
             button.innerHTML = "(Deleting) " + button.innerHTML;
 
-            {% if can_copy %}
-            document.getElementById('formcopy_' + id).disabled = true;
-            $('#formcopy_' + id).popover('hide')
-            {% endif %}
-            {% if can_duplicate %}
-            document.getElementById('duplicate_' + id).disabled = true;
-            {% endif %}
+            if (can_copy === 'True') {
+                document.getElementById('formcopy_' + id).disabled = true;
+                $('#formcopy_' + id).popover('hide')
+            }
+            if (can_duplicate === 'True') {
+                document.getElementById('duplicate_' + id).disabled = true;
+            }
             document.getElementById(id_formset + "-" +  formNum + "-DELETE").checked = true;
             document.getElementById(id_formset + "-" +  formNum + "-DELETE").value =  'on';
-            for (const required_field of requiredFields) {
+            for (const required_field of required_fields) {
                 document.getElementById(id_formset + "-" + formNum + "-" + required_field).required = false;
             }
         } else { {# Untoggle deletion #}
-            button = document.getElementById("button_" + id) 
+            button = document.getElementById("button_" + id)
             button.disabled = false;
             button.innerHTML = button.innerHTML.replace("(Deleting)", "");
-            {% if can_copy %}
-            document.getElementById('formcopy_' + id).disabled = false;
-            {% endif %}
-            {% if can_duplicate %}
-            document.getElementById('duplicate_' + id).disabled = false;
-            {% endif %}
+            if (can_copy === 'True') {
+                document.getElementById('formcopy_' + id).disabled = false;
+            }
+            if (can_duplicate === 'True') {
+                document.getElementById('duplicate_' + id).disabled = false;
+            }
             document.getElementById(id_formset + "-" +  formNum + "-DELETE").checked = false;
             document.getElementById(id_formset + "-" +  formNum + "-DELETE").value = '';
-            for (const required_field of requiredFields) {
+            for (const required_field of required_fields) {
                 document.getElementById(id_formset + "-" + formNum + "-" + required_field).required = true;
             }
         }
     }
 
 
-function duplicateForm(src) {
+function duplicateForm(formset_type, id, required_fields) {
+    var src = formset_type + id;
     srcForm = document.getElementById(src)
-    srcNum = srcForm.id.match(`{{formset_type}}_(\\d+)`)[1]
-    duplicate = addForm(src)
-    dupNum = duplicate.id.match(`{{formset_type}}_(\\d+)`)[1]
-    
+    srcNum = srcForm.id.match(`${formset_type}_(\\d+)`)[1]
+    duplicate = addForm(formset_type, required_fields)
+    dupNum = duplicate.id.match(`${formset_type}_(\\d+)`)[1]
+
     // CloneNode does not copy new user inputs
     for (const field of srcForm.querySelectorAll('input, select, checkbox, textarea')) {
         if (field.id) {
@@ -248,9 +257,9 @@ function duplicateForm(src) {
             } else {
                 duplicate.querySelector('[id=' + field.id.replace(srcNum, dupNum) + ']').value = field.value
             }
-            
+
         }
-    } 
+    }
 
     duplicate.querySelector('[id$=-id]').value = '';
     button = duplicate.querySelector('[id^=button_]')
@@ -264,7 +273,7 @@ function duplicateForm(src) {
 function copyTo(src_field, src_link, form_id) {
     if (typeof copyScript === "function") { copyScript(src_field) }
     src_field = document.getElementById(src_field)
-    data = {form_id: form_id} 
+    data = {form_id: form_id}
     data['csrfmiddlewaretoken'] = document.querySelector('input[name=csrfmiddlewaretoken]').value
     for (const field of src_field.querySelectorAll('input, select, checkbox, textarea')) {
         name = field.name.replace(/(\w+_set)-(\w+)-/, '')
@@ -309,7 +318,7 @@ function copyTo(src_field, src_link, form_id) {
                         <li class="list-group-item">
                             <span class="text-danger font-weight-bold">${field}</span>
                             <br>
-                            ${error}    
+                            ${error}
                         </li>
                     `;
                 }
