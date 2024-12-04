@@ -509,7 +509,7 @@ def exchange_sync(importer, queues, logger, server, debugging):
                                 if importer.keep_mail:
                                     item_obj.is_read = True
                                     item_obj.save(update_fields=['is_read'])
-                                    logger.info("Successfully processed message %s, marked as Answered on server\n" % msg_id.id)
+                                    logger.info("Successfully processed message %s, marked as Read on server\n" % msg_id.id)
                                 else:
                                     item_obj = folder.get(id=msg_id.id, changekey=msg_id.changekey)
                                     item_obj.soft_delete()
@@ -1300,15 +1300,16 @@ def process_exchange_message(message, importer, queues, logger):
         elif isinstance(attachment, ItemAttachment):
             logger.info('- Found ItemAttachment')
             if isinstance(attachment.item, ExchangeMessage):
-                att_sender, att_to_list = '', []
+                att_sender, att_to_list, att_html_body = '', [], ''
                 att_subject = getattr(attachment.item, 'subject', '')
                 if getattr(attachment.item, 'sender', None):
                     att_sender = (attachment.item.sender.name, attachment.item.sender.email_address)
                 if getattr(attachment.item, 'to_recipients', None):
                     att_to_list = [(r.name, r.email_address) for r in attachment.item.to_recipients]
-                att_html_body = attachment.item.body.replace('\n', '').replace('\r', '').replace("</p>", "</p>\n").replace("<br>", "\n<br>").replace("<br/>", "\n<br/>")
-                att_html_body = f"<p>Subject:{att_subject}<br>\nFrom: {att_sender}<br>\nTo: {att_to_list}</p>\n" + att_html_body
-                att_html_body = str(BeautifulSoup(str(att_html_body), "html.parser"))
+                if getattr(attachment.item, 'body', None):
+                    att_html_body = attachment.item.body.replace('\n', '').replace('\r', '').replace("</p>", "</p>\n").replace("<br>", "\n<br>").replace("<br/>", "\n<br/>")
+                    att_html_body = f"<p>Subject:{att_subject}<br>\nFrom: {att_sender}<br>\nTo: {att_to_list}</p>\n" + att_html_body
+                    att_html_body = str(BeautifulSoup(str(att_html_body), "html.parser"))
                 files.append(SimpleUploadedFile(("email_html_attachment_%s.html" % att_counter), att_html_body.encode("utf-8"), 'text/html'))
                 att_counter += 1
 
