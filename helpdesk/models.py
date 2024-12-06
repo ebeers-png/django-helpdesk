@@ -2203,8 +2203,8 @@ class CustomField(models.Model):
         return get_markdown(self.help_text, self.ticket_form.organization)
 
 class DependsOn(models.Model):
-    parent = models.ForeignKey(CustomField, blank=True, null=True, on_delete=models.CASCADE, related_name='parent_fields')
-    dependent = models.ForeignKey(CustomField, blank=True, null=True, on_delete=models.CASCADE, related_name='dependent_fields')
+    parent = models.ForeignKey(CustomField, blank=True, null=True, on_delete=models.CASCADE, related_name='dependent_fields')
+    dependent = models.ForeignKey(CustomField, blank=True, null=True, on_delete=models.CASCADE, related_name='parent_fields')
     parent_alert_text = models.TextField(
         _('Parent Alert Text'),
         help_text=_('Shown to the User in the Parent CustomField when it has a specific value'),
