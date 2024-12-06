@@ -662,14 +662,14 @@ class EditFormTypeForm(forms.ModelForm):
                     'column': cf.column,
                     'lookup': cf.lookup,
                 })
-                if cf.dependent_fields.count():
+                if cf.parent_fields.count():
                     initial_depends_on[cf.id] = [{
                         'id': dcf.id,
                         'parent': dcf.parent,
                         'dependent': cf.id,
                         'parent_alert_text': dcf.parent_alert_text,
                         'value': dcf.value
-                    } for dcf in cf.dependent_fields.all()]
+                    } for dcf in cf.parent_fields.all()]
                 if cf.list_values:
                     list_val_lens.append(len(cf.list_values))
                 else:
