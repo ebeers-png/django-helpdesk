@@ -2212,7 +2212,7 @@ class DependsOn(models.Model):
         null=True
     )
     value = models.TextField(
-        _('Comparison Value'),
+        _('Comparison Value, use Yes / No for boolean values'),
         blank=True,
         null=True,
     )
