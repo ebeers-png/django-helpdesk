@@ -163,14 +163,16 @@
 
     function addForm(formset_type, required_fields=[]) {
         var src = formset_type + '_empty';
-        newForm = document.getElementById(src).cloneNode(true);
+        var newForm = document.getElementById(src).cloneNode(true);
         var name_formset = formset_type.replaceAll("_", "") + "_set";
-        formCount = $('[name$=' + name_formset + '-TOTAL_FORMS]').val();
+        var formCount = $('[name$=' + name_formset + '-TOTAL_FORMS]').val();
 
         // Update form counters
         var re = new RegExp(String.raw`${formset_type}_(?!formset)(\w+)`, "g");
         newForm.innerHTML = newForm.innerHTML.replaceAll(re, formset_type + `_${formCount}`);
         newForm.innerHTML = newForm.innerHTML.replaceAll(/(\w+_set)-(\w+)-/g, `$1-${formCount}-`);
+        let deleteButton = newForm.querySelector(`#delete_${formset_type}_${formCount}`)
+        deleteButton.innerHTML = deleteButton.innerHTML.replaceAll('_empty', `_${formCount}`)
         newForm.id = formset_type + "_" + formCount;
         $('[name$=' + name_formset + '-TOTAL_FORMS]').val(++formCount);
 
