@@ -582,8 +582,8 @@ class EditFormTypeForm(forms.ModelForm):
             sub_formset_post = {}
             for k, v in post_data.items():
                 if f'customfield{indx}dependentfields' in k and '__prefix__' not in k:
-                    new_key = k.replace('dependentfields', 'dependent_fields').replace('_set', '')
-                    new_key = new_key[new_key.index('dependent_fields'):]
+                    new_key = k.replace('dependentfields', 'parent_fields').replace('_set', '')
+                    new_key = new_key[new_key.index('parent_fields'):]
                     sub_formset_post[new_key] = v
             return sub_formset_post
 

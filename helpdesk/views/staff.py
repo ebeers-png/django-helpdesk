@@ -449,7 +449,7 @@ def edit_form(request, pk):
                 'staff': formtype.staff,
                 'unlisted': formtype.unlisted,
             },
-            initial_customfields=CustomField.objects.filter(ticket_form=formtype).prefetch_related('dependent_fields'),
+            initial_customfields=CustomField.objects.filter(ticket_form=formtype).prefetch_related('parent_fields'),
             organization=formtype.organization,
             pk=pk,
         )
@@ -507,6 +507,7 @@ def edit_form(request, pk):
                     # Handle dependent fields
                     sub_formset_post = form.DependsOnFormSet.clean_post_data(cf_indx, request.POST)
                     sub_formset = form.DependsOnFormSet(sub_formset_post, instance=customfield)
+                    breakpoint()
 
                     if sub_formset.is_valid():
                         for sub_df in sub_formset.deleted_forms:
