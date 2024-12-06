@@ -6,6 +6,7 @@ django-helpdesk - A Django powered ticket tracker for small enterprise.
 forms.py - Definitions of newforms-based forms for creating and maintaining
            tickets.
 """
+from collections import defaultdict
 import logging
 from datetime import datetime, date, time
 from decimal import Decimal
@@ -152,6 +153,10 @@ class CustomFieldMixin(object):
             except KeyError:
                 # The data_type was not found anywhere
                 raise NameError("Unrecognized data_type %s" % field.data_type)
+
+        # Disable dependent fields by default
+        if field.parent_fields.all():
+            instanceargs['widget'].attrs['disabled'] = True
 
         # TODO change this
         if is_extra_data(field.field_name):
@@ -721,6 +726,8 @@ class AbstractTicketForm(CustomFieldMixin, forms.Form):
     form_introduction = None
     form_queue = None
     hidden_fields = []
+    parent_to_dependents = {}
+    dependent_to_parents = {}
 
     description = forms.CharField(
         widget=forms.Textarea(attrs={'class': 'form-control'})
@@ -767,6 +774,35 @@ class AbstractTicketForm(CustomFieldMixin, forms.Form):
                 label=_('Knowledge Base Item'),
                 choices=[(kbi.pk, kbi.title) for kbi in KBItem.objects.filter(category=kbcategory.pk, enabled=True)],
             )
+
+        # Two-way map parents and dependents for use in the front-end
+        self.parent_to_dependents = defaultdict(list)
+        self.dependent_to_parents = defaultdict(list)
+
+        def extra_data_name(field_name):
+            if is_extra_data(field_name):
+                return 'e_' + field_name
+            else:
+                return field_name
+
+        for field in form.customfield_set.all():
+            if hasattr(field, 'parent_fields'): # DependsOn instances where this field is the dependent
+                parents = field.parent_fields.all()
+                for parent in parents:
+                    parent_data = {'field_name': extra_data_name(parent.parent.field_name), 'value': parent.value}
+                    self.dependent_to_parents[extra_data_name(field.field_name)].append(parent_data)
+            
+            if hasattr(field, 'dependent_fields'): # DependsOn instances where this field is the parent
+                dependents = field.dependent_fields.all()
+                for dependent in dependents:
+                    alert_prefix = dependent.dependent.label if dependent.dependent.label else dependent.dependent.field_name
+                    alert_text = f'{alert_prefix}: {dependent.parent_alert_text}' if dependent.parent_alert_text else None
+                    dependent_data = {
+                        'field_name': extra_data_name(dependent.dependent.field_name), 
+                        'value': dependent.value, 
+                        'alert_text': alert_text
+                    }
+                    self.parent_to_dependents[extra_data_name(field.field_name)].append(dependent_data)
 
     def clean(self):
         cleaned_data = super(AbstractTicketForm, self).clean()
