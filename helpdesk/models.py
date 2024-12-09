@@ -10,9 +10,9 @@ from django.contrib.auth.models import Permission
 from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ObjectDoesNotExist, ValidationError
-from django.db.models.signals import post_save
+from django.db.models.signals import pre_save, post_save
 from django.dispatch import receiver
-from django.db import models
+from django.db import IntegrityError, models
 from django.conf import settings
 from django.utils import timezone
 from django.utils.translation import ugettext_lazy as _, ugettext
@@ -2217,6 +2217,25 @@ class DependsOn(models.Model):
         null=True,
     )
 
+@receiver(pre_save, sender=DependsOn)
+def detect_circular_dependencies(instance: DependsOn, **kwargs):
+    circular = False
+    for parent in instance.parent.parent_fields.all():
+        circular = circular or circular_dependency(parent, instance.dependent)
+        if circular:
+            raise IntegrityError('Circular dependency detected in form')
+        
+def circular_dependency(current: DependsOn, target: CustomField):
+    if current.parent == target:
+        return True
+    
+    circular = False
+    for parent in current.parent.parent_fields.all():
+        circular = circular or circular_dependency(parent, target)
+        if circular:
+            return circular
+    return circular
+    
 
 class TicketCustomFieldValue(models.Model):
     ticket = models.ForeignKey(
