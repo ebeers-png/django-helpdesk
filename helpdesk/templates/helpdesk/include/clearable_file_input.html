@@ -1,10 +1,10 @@
 <div class="input-group mb-3">
     <div class="input-group-prepend">
-        <button id="{{ widget.name}}_upload" type="button" class="btn btn-secondary">Upload</button>
+        <button id="{{ widget.name}}_upload" type="button" class="btn btn-secondary">{% trans "Upload" %}</button>
     </div>
     <input type="text" class="form-control" disabled id="{{widget.name}}_text" value="{{widget.value}}">
     <div class="input-group-append" id="{{ widget.name }}_interact" style="display:none;">
-        <button id="{{widget.name}}_delete" type="button" class="btn btn-danger">Remove</button>
+        <button id="{{widget.name}}_delete" type="button" class="btn btn-danger">{% trans "Remove" %}</button>
     </div>
 </div>
 <div><input type="file" hidden id="id_{{ widget.name}}" name="{{ widget.name }}" {% include "django/forms/widgets/attrs.html" %}></div>

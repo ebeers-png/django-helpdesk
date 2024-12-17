@@ -15,8 +15,11 @@
 {% block helpdesk_body %}
 <h2>{% trans "Delete Tag" %}</h2>
 
-<p>Are you sure you wish to delete this tag (<em>{{ tag.name }}</em>)?
-    Deleting will remove it from all tickets.</p>
+<p>
+    {% blocktrans with tag.name as tag_name %}
+        Are you sure you wish to delete this tag (<em>{{ tag_name }}</em>)? Deleting will remove it from all tickets.
+    {% endblocktrans %}
+</p>
 
 <form method='post' action='./'>
     <button class="btn btn-danger" type='submit'>{% trans "Delete" %}</button>

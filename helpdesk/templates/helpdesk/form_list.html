@@ -1,13 +1,13 @@
 {% extends "helpdesk/base.html" %}{% load i18n humanize %}
 
-{% block helpdesk_title %}{% blocktrans %} Maintain Forms {% endblocktrans %}{% endblock %}
+{% block helpdesk_title %}{% trans %} Maintain Forms {% trans %}{% endblock %}
 
 {% block helpdesk_breadcrumb %}
 <li class="breadcrumb-item">
     <a href="{% url 'helpdesk:system_settings' %}">{% trans "System Settings" %}</a>
 </li>
 <li class="breadcrumb-item active">
-    Maintain Forms
+    {% trans "Maintain Forms" %}
 </li>
 {% endblock %}
 

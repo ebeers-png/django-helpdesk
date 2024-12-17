@@ -24,8 +24,8 @@ copy_public_link = function() {
                     <tr class=''><th colspan='4'><h3>{{ ticket.queue.slug }}-{{ ticket.id }}. {{ ticket.title }} [{{ ticket.get_status }}]</h3>
                         <div class="d-flex justify-content-between">
                             <div>
-                                Queue: {{ ticket.queue.title }}<br/>
-                                Form: {{ ticket.ticket_form.name }}
+                                {% trans "Queue" %}: {{ ticket.queue.title }}<br/>
+                                {% trans "Form" %}: {{ ticket.ticket_form.name }}
                             </div>
                             <div>
                                 <span><a href="{% url 'helpdesk:enable_disable_emails' ticket.id %}" class="btn btn-{% if not ticket.allow_sending %}outline-{% endif %}danger btn-sm">
@@ -107,7 +107,7 @@ copy_public_link = function() {
 					</th></tr>
                     {% endif %}
 					<tr class=''><th colspan='4'>
-                        <a href="#" onclick="copy_public_link()">Click to copy Public Link to your Clipboard</a>
+                        <a href="#" onclick="copy_public_link()">{% trans "Click to copy Public Link to your Clipboard"%}</a>
 					</th></tr>
                 </thead>
                 <tbody>
@@ -116,9 +116,9 @@ copy_public_link = function() {
                         {% if row %}<tr>{% endif %}
                             <th class="table-secondary">
                                 {% if field.has_column %}
-                                {% if field.lookup %}<span title="This field is used to look up buildings in BEAM's inventory.">{{ field.label }} <i class="fas fa-search"></i></span>
-                                {% else %}<span title="This field is paired to a column in BEAM's inventory.">{{ field.label }} <i class="fas fa-city"></i></span>{% endif %}
-                                {% else %}{{ field.label }}{% endif %}
+                                {% if field.lookup %}<span title="This field is used to look up buildings in BEAM's inventory.">{% trans field.label %} <i class="fas fa-search"></i></span>
+                                {% else %}<span title="This field is paired to a column in BEAM's inventory.">{% trans field.label %} <i class="fas fa-city"></i></span>{% endif %}
+                                {% else %}{% trans field.label %}{% endif %}
                             </th>
                             {% if forloop.last and row %} <td colspan="3"> {% else %} <td> {% endif %}
                             {% spaceless %}{% if "url" == field.data_type %}<a href='{{ field.value }}'>{{ field.value }}</a>

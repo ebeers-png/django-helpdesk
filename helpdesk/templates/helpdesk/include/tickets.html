@@ -69,7 +69,11 @@
             </ul>
         {% endif %}
     </div>
-    <div class="card-footer small text-muted">Listing {{ ticket_list|length }} ticket(s) out of {{ ticket_list.paginator.count }}.</div>
+    <div class="card-footer small text-muted">
+        {% blocktrans with ticket_count=ticket_list|length total_tickets=ticket_list.paginator.count %}
+        Listing {{ ticket_count }} ticket(s) out of {{ total_tickets }}.
+        {% endblocktrans %}
+    </div>
 </div>
 
 
