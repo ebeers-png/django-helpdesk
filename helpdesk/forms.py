@@ -578,9 +578,7 @@ class EditFormTypeForm(forms.ModelForm):
                 return custom_field.label if custom_field.label else custom_field.field_name
 
         def clean(self):
-            print(self.data)
             super().clean()
-            print(self.cleaned_data)
 
         @staticmethod
         def clean_post_data(indx, post_data):
