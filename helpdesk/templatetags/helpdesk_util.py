@@ -14,6 +14,10 @@ def get(value, arg, default=None):
     """ Call the dictionary get function """
     return value.get(arg, default)
 
+@register.filter
+def dict_string(dict):
+    """ Format dictionary contents as string """
+    return ', '.join([f'{key}: {value}' for key, value in dict.items()])
 
 @register.filter(expects_localtime=True)
 def datetime_string_format(value):
