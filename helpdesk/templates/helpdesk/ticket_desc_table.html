@@ -126,6 +126,11 @@ copy_public_link = function() {
                                 {% elif "date" == field.data_type %}{{ field.value|datetime_string_format }}
                                 {% elif "time" == field.data_type %}{{ field.value|datetime_string_format }}
                                 {% elif "boolean" == field.data_type %}{{ field.value }}
+                                {% elif "key_value" == field.data_type %}
+                                    {% for key, value in field.value.items %}
+                                        <strong>{{key}}</strong>: {{value}}{% if not forloop.last %},{% endif %}
+                                    {% endfor %}
+                                {% elif "checkbox_list" == field.data_type %}{{ field.value|join:', '}}
                                 {% else %}{{ field.value|default:"" }}
                                 {% endif %}{% endspaceless %}</td>
                         {% if not row %}</tr>{% endif %}
