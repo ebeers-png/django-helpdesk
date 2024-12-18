@@ -513,7 +513,7 @@ def edit_form(request, pk):
                             sub_formset_post = form.DependsOnFormSet.clean_post_data(cf_indx, request.POST)
                             sub_formset = form.DependsOnFormSet(sub_formset_post, instance=customfield)
 
-                            if sub_formset.is_valid():
+                            if sub_formset_post and sub_formset.is_valid():
                                 for sub_df in sub_formset.deleted_forms:
                                     if sub_df.cleaned_data['id']: sub_df.cleaned_data['id'].delete()
 
