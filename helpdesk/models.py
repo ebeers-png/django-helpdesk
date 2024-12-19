@@ -13,6 +13,7 @@ from django.core.exceptions import ObjectDoesNotExist, ValidationError
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 from django.db import models
+from django.db.models import Q
 from django.conf import settings
 from django.utils import timezone
 from django.utils.translation import ugettext_lazy as _, ugettext
@@ -396,6 +397,10 @@ class FormType(models.Model):
     unlisted = models.BooleanField(_('Unlisted'), blank=False, default=False,
                                    help_text=_('Should this form be hidden from the public form list? '
                                                '(If the "public" option is checked, this form will still be accessible by everyone through the link.)'))
+    auto_pair = models.BooleanField(_('Automatically Pair'), blank=False, default=False,
+                                    help_text=_('Should form submissions automatically attempt to pair with the BEAM inventory?'))
+    auto_copy = models.BooleanField(_('Automatically Copy to Beam'), blank=False, default=False,
+                                    help_text=_('Should form submissions automatically copy data to the paired BEAM property or tax lot?'))
 
     # Add Preset Form Fields to the Database, avoiding having to run a PSQL command in another terminal window.
     # This will happen automatically upon FormType Creation
@@ -406,6 +411,16 @@ class FormType(models.Model):
         # TODO index by organization and id?
         get_latest_by = "created"
         ordering = ('id',)
+
+        constraints=[
+            models.CheckConstraint(
+                check=(
+                    Q(auto_copy=False)
+                    | Q(auto_copy=True, auto_pair=True)
+                ),
+                name='form_auto_pair_if_auto_copy'
+            )
+        ]
 
     def __str__(self):
         return 'FormType - %s %s' % (self.id, self.name)

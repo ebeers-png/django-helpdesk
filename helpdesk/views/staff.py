@@ -365,7 +365,9 @@ def create_form(request):
                 'queue': formtype.queue,
                 'public': formtype.public,
                 'staff': formtype.staff,
-                'unlisted': formtype.unlisted
+                'unlisted': formtype.unlisted,
+                'auto_pair': formtype.auto_pair,
+                'auto_copy': formtype.auto_copy
             },
             initial_customfields = CustomField.objects.filter(ticket_form=formtype),
             organization = org,
@@ -391,6 +393,8 @@ def create_form(request):
             formtype.public = form.cleaned_data['public']
             formtype.staff = form.cleaned_data['staff']
             formtype.unlisted = form.cleaned_data['unlisted']
+            formtype.auto_pair = form.cleaned_data['auto_pair']
+            formtype.auto_pair = form.cleaned_data['auto_copy']
             formtype.save() 
 
             if formset.is_valid():
@@ -447,7 +451,9 @@ def edit_form(request, pk):
                 'queue': formtype.queue,
                 'public': formtype.public,
                 'staff': formtype.staff,
-                'unlisted': formtype.unlisted
+                'unlisted': formtype.unlisted,
+                'auto_pair': formtype.auto_pair,
+                'auto_copy': formtype.auto_copy
             },
             initial_customfields = CustomField.objects.filter(ticket_form=formtype),
             organization = formtype.organization,
@@ -472,6 +478,8 @@ def edit_form(request, pk):
             formtype.public = form.cleaned_data['public']
             formtype.staff = form.cleaned_data['staff']
             formtype.unlisted = form.cleaned_data['unlisted']
+            formtype.auto_pair = form.cleaned_data['auto_pair']
+            formtype.auto_pair = form.cleaned_data['auto_copy']
             formtype.save() 
             
             if formset.is_valid():
@@ -3211,8 +3219,6 @@ def batch_pair_properties_tickets(request, ticket_ids):
 
     return HttpResponseRedirect(reverse('helpdesk:list'))
 
-
-@staff_member_required
 def _pair_properties_by_form(request, form, tickets):
     from seed.models import PropertyState, TaxLotState, TaxLotView, PropertyView, Cycle
 

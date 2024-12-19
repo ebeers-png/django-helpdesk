@@ -97,6 +97,21 @@
         
         $('[id^=colsearch_]').on('input', debounced())
     })
+
+    // Only allow auto_copy if auto_pair is checked
+    auto_pair = document.getElementById('id_auto_pair')
+    auto_copy = document.getElementById('id_auto_copy')
+    function checkDisableCopy() {
+        if (auto_pair.checked) {
+            auto_copy.disabled = false
+        } else {
+            auto_copy.disabled = true
+            auto_copy.checked = false
+        }
+    }
+    checkDisableCopy()
+
+    auto_pair.addEventListener('change', checkDisableCopy)
     
     function removeEmpty() {
         if (document.querySelector('#edit_form').checkValidity()) {
