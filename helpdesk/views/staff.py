@@ -3566,6 +3566,8 @@ def update_building_data(request, ticket_id):
         response = viewset.update(update_request, pk=view.id)
         return response
 
+# def update_building_data_request(ticket, cycle, view):
+#     pass
 
 def add_remove_label(org_id, user, payload, inventory_type):
     """

@@ -27,6 +27,7 @@ from helpdesk.models import (Ticket, Queue, FollowUp, IgnoreEmail, TicketCC,
                              FormType, KBCategory, KBIAttachment, is_extra_data, PreSetReply, EmailTemplate, clean_html)
 from helpdesk import settings as helpdesk_settings
 from helpdesk.email import create_ticket_cc
+from helpdesk.views.staff import _pair_properties_by_form, update_building_data
 from helpdesk.decorators import list_of_helpdesk_staff
 import re
 
@@ -921,6 +922,12 @@ class AbstractTicketForm(CustomFieldMixin, forms.Form):
             building_id=self.cleaned_data.get('building_id', None),
             extra_data=extra_data
         )
+
+        # TODO: auto pair / copy
+        if ticket_form.auto_pair:
+            _pair_properties_by_form(None, ticket_form, [ticket])
+            # if ticket_form.auto_copy:
+                # update_building_data(None, ticket.id)
 
         return ticket, queue
 
