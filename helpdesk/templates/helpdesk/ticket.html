@@ -58,13 +58,29 @@
                                         <li>{% blocktrans with change.field as field and change.old_value as old_value and change.new_value as new_value %}Changed {{ field }} from {{ old_value }} to {{ new_value }}.{% endblocktrans %}</li>
                                     {% if forloop.last %}</ul></div>{% endif %}
                                 {% endfor %}
-                                {% for attachment in followup.followupattachment_set.all %}{% if forloop.first %}{% trans "Attachments" %}:<div class='attachments'><ul>{% endif %}
-                                    <li><a href='{{ attachment.file.url }}'>{{ attachment.filename }}</a> ({{ attachment.mime_type }}, {{ attachment.size|filesizeformat }})
-                                    {% if followup.user and request.user == followup.user %}
-                                    <a href="{% url 'helpdesk:attachment_del' ticket.id attachment.id %}"><button class="btn btn-danger btn-sm"><i class="fas fa-trash"></i></button></a>
+                                {% for attachment in followup.followupattachment_set.all %}
+                                    {% if forloop.first %}
+                                        {% trans "Attachments" %}:
+                                        <div class="attachments">
+                                            <ul>
                                     {% endif %}
+                                    <li>
+                                        {% if attachment.mime_type in "application/pdf,image/png,image/jpeg,image/gif,image/webp,text/plain" %}
+                                            <a href="{{ attachment.file.url }}" target="_blank">{{ attachment.filename }}</a> 
+                                        {% else %}
+                                            <a href="{{ attachment.file.url }}" download>{{ attachment.filename }}</a> 
+                                        {% endif %}
+                                        ({{ attachment.mime_type }}, {{ attachment.size|filesizeformat }})
+                                        {% if followup.user and request.user == followup.user %}
+                                            <a href="{% url 'helpdesk:attachment_del' ticket.id attachment.id %}">
+                                                <button class="btn btn-danger btn-sm"><i class="fas fa-trash"></i></button>
+                                            </a>
+                                        {% endif %}
                                     </li>
-                                    {% if forloop.last %}</ul></div>{% endif %}
+                                    {% if forloop.last %}
+                                            </ul>
+                                        </div>
+                                    {% endif %}
                                 {% endfor %}
                             </p>
                             <!--- ugly long test to suppress the following if it will be empty, to save vertical space -->
