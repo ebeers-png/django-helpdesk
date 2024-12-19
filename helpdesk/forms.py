@@ -27,7 +27,7 @@ from helpdesk.models import (Ticket, Queue, FollowUp, IgnoreEmail, TicketCC,
                              FormType, KBCategory, KBIAttachment, is_extra_data, PreSetReply, EmailTemplate, clean_html)
 from helpdesk import settings as helpdesk_settings
 from helpdesk.email import create_ticket_cc
-from helpdesk.views.staff import _pair_properties_by_form, update_building_data
+# from helpdesk.views.staff import _pair_properties_by_form, update_building_data
 from helpdesk.decorators import list_of_helpdesk_staff
 import re
 
