@@ -2264,6 +2264,8 @@ def report_index(request):
     Queues = user_queues if user_queues else Queue.objects.all()
 
     dash_tickets = []
+    number_closed = 0
+    number_closed_last_60__days = 0
     for queue in Queues:
         dash_ticket = {
             'queue': queue.id,
@@ -2271,13 +2273,18 @@ def report_index(request):
             'open': queue.ticket_set.filter(status__in=[1, 2]).count(),
             'resolved': queue.ticket_set.filter(status=3).count(),
             'closed': queue.ticket_set.filter(status=4).count(),
+            'closed_last_60_days': queue.ticket_set.filter(status=4,created__gte=timezone.now() - timedelta(days=60)).count(),
             'time_spent': format_time_spent(queue.time_spent),
             'dedicated_time': format_time_spent(queue.dedicated_time)
         }
         dash_tickets.append(dash_ticket)
+        number_closed += dash_ticket['closed']
+        number_closed_last_60__days += dash_ticket['closed_last_60_days']
 
     return render(request, 'helpdesk/report_index.html', {
         'number_tickets': number_tickets,
+        'number_closed': number_closed,
+        'number_closed_last_60__days': number_closed_last_60__days,
         'saved_query': saved_query,
         'basic_ticket_stats': basic_ticket_stats,
         'dash_tickets': dash_tickets,
