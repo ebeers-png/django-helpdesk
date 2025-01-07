@@ -17,11 +17,11 @@
 <div class="d-flex">
     <h2>{% trans 'Manage Knowledgebase' %}</h2>
     <div class="flex-fill d-flex justify-content-end">
-        <a class="btn btn-success align-self-center mr-1" href="{% url 'helpdesk:create_kb_category' %}"><i class="fa fa-plus mr-1"></i> Create Category</a>
+        <a class="btn btn-success align-self-center mr-1" href="{% url 'helpdesk:create_kb_category' %}"><i class="fa fa-plus mr-1"></i> {% trans "Create Category" %}</a>
         {% if kb_categories %}
         <div class="btn-group">
-            <button class="btn btn-outline-primary align-self-center" onclick="expandAll()"><i class="fa fa-plus-square mr-1"></i>Expand All</button>
-            <button class="btn btn-outline-secondary align-self-center" onclick="collapseAll()"><i class="fa fa-minus-square mr-1"></i>Collapse All</button>
+            <button class="btn btn-outline-primary align-self-center" onclick="expandAll()"><i class="fa fa-plus-square mr-1"></i>{% trans "Expand All" %}</button>
+            <button class="btn btn-outline-secondary align-self-center" onclick="collapseAll()"><i class="fa fa-minus-square mr-1"></i>{% trans "Collapse All" %}</button>
         </div>
         {% endif %}
     </div>
@@ -34,15 +34,15 @@
         <div class="card-header border-bottom-0" id="category_{{ category.id }}">
             <div class="d-flex align-items-center">
                 {% if category.public %}
-                    <div class="badge badge-success font-weight-bold mr-3" style="font-size: 15px; min-width: 57px">Public</div>
+                    <div class="badge badge-success font-weight-bold mr-3" style="font-size: 15px; min-width: 57px">{% trans "Public" %}</div>
                 {% else %}
-                    <div class="badge badge-danger font-weight-bold mr-3" style="font-size: 15px; min-width: 57px">Private</div>
+                    <div class="badge badge-danger font-weight-bold mr-3" style="font-size: 15px; min-width: 57px">{% trans "Private" %}</div>
                 {% endif %}
                 <h4 class="mb-0 flex-fill">
                     {{ category.title }}
                 </h4>
                 <a class="btn btn-success mr-2" href="{% url 'helpdesk:create_kb_article' category.slug %}">
-                    <i class="fa fa-plus mr-1"></i>Create Article
+                    <i class="fa fa-plus mr-1"></i>{% trans "Create Article" %}
                 </a>
                 <a class="btn btn-warning mr-1" href="{% url 'helpdesk:edit_kb_category' category.slug %}">
                     <i class="fa fa-pen"></i>
@@ -63,12 +63,12 @@
                 <table class="table table-borderless mb-0">
                     <thead class="thead bg-light border-bottom">
                         <tr>
-                            <th class="pt-0" style="width: 33%">Question</th>
-                            <th class="text-center pt-0" style="width:10%;">Last Updated</th>
-                            <th class="text-center pt-0" style="width:1%;">Public</th>
-                            <th class="text-center pt-0" style="width:1%;">Unlisted</th>
-                            <th class="text-center pt-0" style="width:1%;">Ordering</th>
-                            <th class="text-center pt-0" style="width:1%;">Edit</th>
+                            <th class="pt-0" style="width: 33%">{% trans "Question" %}</th>
+                            <th class="text-center pt-0" style="width:10%;">{% trans "Last Updated" %}</th>
+                            <th class="text-center pt-0" style="width:1%;">{% trans "Public" %}</th>
+                            <th class="text-center pt-0" style="width:1%;">{% trans "Unlisted" %}</th>
+                            <th class="text-center pt-0" style="width:1%;">{% trans "Ordering" %}</th>
+                            <th class="text-center pt-0" style="width:1%;">{% trans "Edit" %}</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -106,7 +106,12 @@
                     </tbody>
                 </table>
                 {% else %}
-                <p class="text-center m-2"> No articles in the category, <a href="{% url 'helpdesk:create_kb_article' category.slug%}">create one</a>!</p>
+                <p class="text-center m-2">
+                    {% blocktrans %}No articles in the category,{% endblocktrans %}
+                    <a href="{% url 'helpdesk:create_kb_article' category.slug %}">
+                        {% blocktrans %}create one{% endblocktrans %}
+                    </a>!
+                </p>
                 {% endif %}
             </div>
         </div>

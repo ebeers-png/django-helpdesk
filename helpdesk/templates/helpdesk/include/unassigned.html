@@ -70,7 +70,11 @@
             </ul>
         {% endif %}
     </div>
-    <div class="card-footer small text-muted">Listing {{ unassigned_tickets|length }} ticket(s) out of {{ unassigned_tickets.paginator.count }}.</div>
+    <div class="card-footer small text-muted">
+        {% blocktrans with ticket_count=unassigned_tickets|length total_tickets=unassigned_tickets.paginator.count %}
+        Listing {{ ticket_count }} ticket(s) out of {{ total_tickets }}.
+        {% endblocktrans %}
+    </div>
 </div>
 
 {% for kbitem in kbitems %}

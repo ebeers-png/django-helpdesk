@@ -17,7 +17,7 @@
     <a href="{{ ticket.get_absolute_url }}">{{ ticket.queue.slug }}-{{ ticket.id }}</a>
 </li>
 <li class="breadcrumb-item active">
-    Copy ticket data to BEAM inventory
+    {% trans "Copy ticket data to BEAM inventory" %}
 </li>
 {% endblock %}
 
@@ -31,7 +31,7 @@
                 <div id="group_cycle_select" class="form-group">
                     <h5>{% blocktrans %}First, select a cycle to update.{% endblocktrans %}</h5>
                     <select class="custom-select" id="cycle_select" name="cycle_id">
-                        <option value="" selected>Your Cycle Selection</option>
+                        <option value="" selected>{% trans "Your Cycle Selection" %}</option>
                         {% for cycle in cycles %}
                         <option value="{{ cycle.id }}">{{ cycle.name }}</option>
                         {% endfor %}
@@ -40,7 +40,7 @@
                 <div id="group_building_select" class="form-group">
                     <h5>{% trans "Select a property or taxlot to edit." %}</h5>
                     <select class="custom-select" id="building_select" name="building_id">
-                        <option value="" selected>Your Property Selection</option>
+                        <option value="" selected>{% trans "Your Property Selection" %}</option>
                         {% for cycle, views in properties_per_cycle.items %}
                         {% for view in views %}
                         <option value="PropertyState-{{ cycle.id }}-{{ view.id }}">{% if view.address %}{{ view.address }}{% else %}PM Property ID: {{ view.building_id }}{% endif %}</option>

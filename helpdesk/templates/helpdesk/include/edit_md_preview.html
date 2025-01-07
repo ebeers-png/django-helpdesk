@@ -1,11 +1,13 @@
+{% load i18n humanize %}
+
 <div class="card">
     <div class="card-header">
         <ul class="nav nav-tabs card-header-tabs" data-bs-tabs="tabs">
             <li class="nav-item">
-                <a class="nav-link active" data-toggle="tab" href="#{{widget.name}}_edit">Edit</a>
+                <a class="nav-link active" data-toggle="tab" href="#{{widget.name}}_edit">{% trans "Edit" %}</a>
             </li>
             <li class="nav-item">
-                <a class="nav-link" data-toggle="tab" href="#{{widget.name}}_preview" onclick="updatePreview('{{widget.name}}')">Preview</a>
+                <a class="nav-link" data-toggle="tab" href="#{{widget.name}}_preview" onclick="updatePreview('{{widget.name}}')">{% trans "Preview" %}</a>
             </li>
         </ul>
     </div>

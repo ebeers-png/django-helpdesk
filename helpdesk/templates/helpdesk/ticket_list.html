@@ -14,7 +14,7 @@
 {% endif %}
 {% endblock %}
 
-{% block h1_title %}Tickets
+{% block h1_title %}{% trans "Tickets" %}
 {% if from_saved_query %} [{{ saved_query.title }}]{% endif %}
 {% endblock %}
 
@@ -37,17 +37,17 @@
     <!-- Action Toolbar -->
     <div class="d-flex flex-wrap justify-content-between overflow-auto pb-2 mw-100" style="max-width: 100%;">
         <a id="show_query" class="btn btn-outline-primary mr-2" onclick="toggleQuerySelector()">
-            <span id="show_query_text"><i class="fas fa-eye"></i> Show Filter Menu</span>
-            <span id="hide_query_text"><i class="fas fa-eye-slash"></i> Hide Filter Menu</span>
+            <span id="show_query_text"><i class="fas fa-eye"></i> {% trans "Show Filter Menu" %}</span>
+            <span id="hide_query_text"><i class="fas fa-eye-slash"></i> {% trans "Hide Filter Menu" %}</span>
         </a>
         <div class="d-flex align-items-center">
             <div class="input-group">
                 <div class="input-group-prepend">
-                    <label class="input-group-text bg-white border-0">Select:</label>
+                    <label class="input-group-text bg-white border-0">{% trans "Select" %}:</label>
                 </div>
                 <div class="input-group-append">
-                    <button id="select_all_btn" class="btn btn-outline-primary rounded-left font-weight-semibold" type="button">All <i class="fa fa-plus-circle mr-1"></i></button>
-                    <button id="select_none_btn" class="btn btn-outline-danger font-weight-semibold" type="button">None <i class="fa fa-times-circle mr-1"></i></button>
+                    <button id="select_all_btn" class="btn btn-outline-primary rounded-left font-weight-semibold" type="button">{% trans "All" %} <i class="fa fa-plus-circle mr-1"></i></button>
+                    <button id="select_none_btn" class="btn btn-outline-danger font-weight-semibold" type="button">{% trans "None" %} <i class="fa fa-times-circle mr-1"></i></button>
                 </div>
             </div>
         </div>
@@ -55,7 +55,7 @@
         {% if tag_choices|length %}
         <div>
             <div class="dropdown">
-                <a id="editTagsDropdown" class="btn btn-outline-secondary dropdown-toggle disabled" href="#" role="button" data-toggle="dropdown" data-boundary="window" aria-expanded="false" onclick="getTags()">Add/Remove Tags</a>
+                <a id="editTagsDropdown" class="btn btn-outline-secondary dropdown-toggle disabled" href="#" role="button" data-toggle="dropdown" data-boundary="window" aria-expanded="false" onclick="getTags()">{% trans "Add" %}/{% trans "Remove" %} {% trans "Tags" %}</a>
                 <div class="dropdown-menu dropdown-menu-left"  onclick="event.stopPropagation()" style="z-index: 1021;">
                     <form id="tagForm" class="pr-3 pt-1">
                         {% csrf_token %}
@@ -68,7 +68,7 @@
                         </div>
                         {% endfor %}
                     </form>
-                    <button onclick="massUpdateTags()" class="btn btn-primary m-2 float-right">Save</button>
+                    <button onclick="massUpdateTags()" class="btn btn-primary m-2 float-right">{% trans "Save" %}</button>
                 </div>
             </div>
         </div>
@@ -78,26 +78,26 @@
                 {% csrf_token %}
                 <div class="input-group">
                     <div class="input-group-prepend">
-                        <label class="input-group-text bg-white border-0">Action:</label>
+                        <label class="input-group-text bg-white border-0">{% trans "Action" %}:</label>
                     </div>
                     <select class="custom-select rounded-left" name="action" id="id_mass_action" disabled>
-                        <option selected>Choose...</option>
-                        <option value="take">Take (Assign to me)</option>
-                        <option value="delete">Delete</option><option value="merge">Merge</option>
-                        <option value="export">Export</option><option value="pair">Pair to BEAM inventory</option>
+                        <option selected>{% trans "Choose..." %}</option>
+                        <option value="take">{% trans "Take" %} ({% trans "Assign to me" %})</option>
+                        <option value="delete">{% trans "Delete" %}</option><option value="merge">{% trans "Merge" %}</option>
+                        <option value="export">{% trans "Export" %}</option><option value="pair">{% trans "Pair to BEAM inventory" %}</option>
                         <optgroup label="Close">
-                            <option value="close">Close (Don't Send E-Mail)</option>
-                            <option value="close_public">Close (Send E-Mail)</option>
+                            <option value="close">{% trans "Close" %} ({% trans "Don't Send E-Mail" %})</option>
+                            <option value="close_public">{% trans "Close" %} ({% trans "Send E-Mail" %})</option>
                         </optgroup>
                         <optgroup label="Set Owner">
-                            <option value="unassign">Nobody (Unassign)</option>
+                            <option value="unassign">{% trans "Nobody" %} ({% trans "Unassign" %})</option>
                             {% for u in user_choices %}
                             <option value="assign_{{ u.id }}">{% if u.first_name and u.last_name %}{{ u.first_name}} {{ u.last_name }}{% else %}{{ u.username }}{% endif %}</option>
                             {% endfor %}
                         </optgroup>
                     </select>
                     <div class="input-group-append">
-                        <button id="massActionButton" type="button" onclick="massUpdate()" class="btn btn-outline-secondary" disabled>Run Action <i class="fa fa-arrow-circle-right mr-1"></i></button>
+                        <button id="massActionButton" type="button" onclick="massUpdate()" class="btn btn-outline-secondary" disabled>{% trans "Run Action" %} <i class="fa fa-arrow-circle-right mr-1"></i></button>
                     </div>
                 </div>
                 <!-- Pass vars to View for exporting to work Properly -->
@@ -108,47 +108,47 @@
         </div>
         <div>
             <div id="colvis" class="dropdown">
-                <button class="btn btn-outline-secondary float-right font-weight-semibold dropdown-toggle" type="button" data-boundary="window" aria-expanded="false">Column Visibility</button>
+                <button class="btn btn-outline-secondary float-right font-weight-semibold dropdown-toggle" type="button" data-boundary="window" aria-expanded="false">{% trans "Column Visibility" %}</button>
                 <div class="dropdown-menu dropdown-menu-left text-center p-2" style="min-width: 0; z-index: 1021;">
                     <div class="btn-group-vertical btn-group-toggle" data-toggle="buttons">
                         <label class="btn btn-outline-secondary">
-                            <input type="checkbox" onchange="toggleColumn(this.checked, 'priority')"> Priority
+                            <input type="checkbox" onchange="toggleColumn(this.checked, 'priority')"> {% trans "Priority" %}
                         </label>
                         <label class="btn btn-outline-secondary">
-                            <input type="checkbox" onchange="toggleColumn(this.checked, 'queue')"> Queue
+                            <input type="checkbox" onchange="toggleColumn(this.checked, 'queue')"> {% trans "Queue" %}
                         </label>
                         <label class="btn btn-outline-secondary">
-                            <input type="checkbox" onchange="toggleColumn(this.checked, 'form')"> Form
+                            <input type="checkbox" onchange="toggleColumn(this.checked, 'form')"> {% trans "Form" %}
                         </label>
                         <label class="btn btn-outline-secondary active">
-                            <input type="checkbox" onchange="toggleColumn(this.checked, 'status')" checked> Status
+                            <input type="checkbox" onchange="toggleColumn(this.checked, 'status')" checked> {% trans "Status" %}
                         </label>
                         <label class="btn btn-outline-secondary active">
-                            <input type="checkbox" onchange="toggleColumn(this.checked, 'assigned_to')" checked> Owner
+                            <input type="checkbox" onchange="toggleColumn(this.checked, 'assigned_to')" checked> {% trans "Owner" %}
                         </label>
                         <label class="btn btn-outline-secondary active">
-                            <input type="checkbox" onchange="toggleColumn(this.checked, 'submitter')" checked> Submitter
+                            <input type="checkbox" onchange="toggleColumn(this.checked, 'submitter')" checked> {% trans "Submitter" %}
                         </label>
                         <label class="btn btn-outline-secondary">
-                            <input type="checkbox" onchange="toggleColumn(this.checked, 'paired_count')"> Paired Count
+                            <input type="checkbox" onchange="toggleColumn(this.checked, 'paired_count')"> {% trans "Paired Count" %}
                         </label>
                         <label class="btn btn-outline-secondary active">
-                            <input type="checkbox" onchange="toggleColumn(this.checked, 'created')" checked> Created
+                            <input type="checkbox" onchange="toggleColumn(this.checked, 'created')" checked> {% trans "Created" %}
                         </label>
                         <label class="btn btn-outline-secondary active">
-                            <input type="checkbox" onchange="toggleColumn(this.checked, 'last_reply')" checked> Last Reply
+                            <input type="checkbox" onchange="toggleColumn(this.checked, 'last_reply')" checked> {% trans "Last Reply" %}
                         </label>
                         <label class="btn btn-outline-secondary">
-                            <input type="checkbox" onchange="toggleColumn(this.checked, 'due_date')"> Due Date
+                            <input type="checkbox" onchange="toggleColumn(this.checked, 'due_date')"> {% trans "Due Date" %}
                         </label>
                         <label class="btn btn-outline-secondary">
-                            <input type="checkbox" onchange="toggleColumn(this.checked, 'time_spent')"> Time Spent
+                            <input type="checkbox" onchange="toggleColumn(this.checked, 'time_spent')"> {% trans "Time Spent" %}
                         </label>
                         <label class="btn btn-outline-secondary">
-                            <input type="checkbox" onchange="toggleColumn(this.checked, 'kbitem')"> KB Item
+                            <input type="checkbox" onchange="toggleColumn(this.checked, 'kbitem')"> {% trans "KB Item" %}
                         </label>
                         <label class="btn btn-outline-secondary">
-                            <input type="checkbox" onchange="toggleColumn(this.checked, 'tags')"> Tags
+                            <input type="checkbox" onchange="toggleColumn(this.checked, 'tags')"> {% trans "Tags" %}
                         </label>
                     </div>
                 </div>
@@ -272,11 +272,11 @@
                                     <div class="btn-toolbar float-right" role="toolbar" style="bottom: 0;">
                                         <div class="btn-group mr-2" role="group">
                                             {% if ticket_list.has_previous %}
-                                            <button class="btn btn-primary font-weight-bold" onclick="paginatedQuery()">First</button>
-                                            <button class="btn btn-primary font-weight-bold" onclick="paginatedQuery({{ ticket_list.previous_page_number }})">Previous</button>
+                                            <button class="btn btn-primary font-weight-bold" onclick="paginatedQuery()">{% trans "First" %}</button>
+                                            <button class="btn btn-primary font-weight-bold" onclick="paginatedQuery({{ ticket_list.previous_page_number }})">{% trans "Previous" %}</button>
                                             {% else %}
-                                            <button class="btn btn-primary font-weight-bold disabled">First</button>
-                                            <button class="btn btn-primary font-weight-bold disabled">Previous</button>
+                                            <button class="btn btn-primary font-weight-bold disabled">{% trans "First" %}</button>
+                                            <button class="btn btn-primary font-weight-bold disabled">{% trans "Previous" %}</button>
                                             {% endif %}
                                         </div>
                                         <div class="btn-group mr-2" role="group">
@@ -292,11 +292,11 @@
                                         </div>
                                         <div class="btn-group" role="group">
                                             {% if ticket_list.has_next %}
-                                            <button class="btn btn-primary font-weight-bold" onclick="paginatedQuery({{ ticket_list.next_page_number }})">Next</button>
-                                            <button class="btn btn-primary font-weight-bold" onclick="paginatedQuery({{ ticket_list.paginator.num_pages }})">Last</button>
+                                            <button class="btn btn-primary font-weight-bold" onclick="paginatedQuery({{ ticket_list.next_page_number }})">{% trans "Next" %}</button>
+                                            <button class="btn btn-primary font-weight-bold" onclick="paginatedQuery({{ ticket_list.paginator.num_pages }})">{% trans "Last" %}</button>
                                             {% else %}
-                                            <button class="btn btn-primary font-weight-bold disabled">Next</button>
-                                            <button class="btn btn-primary font-weight-bold disabled">Last</button>
+                                            <button class="btn btn-primary font-weight-bold disabled">{% trans "Next" %}</button>
+                                            <button class="btn btn-primary font-weight-bold disabled">{% trans "Last" %}</button>
                                             {% endif %}
                                         </div>
                                     </div>
@@ -316,7 +316,7 @@
     <div class="col-sm-4 col-md-3 col-lg-2 pr-0" id="query_select">
         <div class="card mb-3">
             <div class="card-header font-weight-bold bg-gray">
-                Your Saved Searches
+                {% trans "Saved Searches" %}
             </div>
             <div class="card-body p-0">
 
@@ -342,11 +342,11 @@
                         <input type='hidden' name='query_encoded' value='{{ urlsafe_query }}'/>
                         <input type='hidden' name='visible' value=''/>
                         <input type='hidden' name='shared' value='0'/>
-                        Save the current search filters?
+                        {% trans "Save the current search filters?" %}
                         <div class="input-group pt-1">
                           <input type="text" class="form-control" name='title' id='id_title' placeholder="Name" aria-label="Save query name" aria-describedby="basic-addon2">
                           <div class="input-group-append">
-                            <button class="btn btn-outline-secondary" type="submit">Save</button>
+                            <button class="btn btn-outline-secondary" type="submit">{% trans "Save" %}</button>
                           </div>
                         </div>
                     </form>

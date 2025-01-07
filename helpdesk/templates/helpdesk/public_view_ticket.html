@@ -26,7 +26,7 @@
     <thead>
         <tr>
             <th colspan='2'>
-                <h3>Ticket details for <span class="byline text-info">{{ ticket.ticket }}{% if ticket.title %} {{ ticket.title }}{% endif %}</span> {% if ticket.get_status == 'Replied' %}(Open){% else %}({{ ticket.get_status }}){% endif %}</h3>
+                <h3>{% trans "Ticket details for" %} <span class="byline text-info">{{ ticket.ticket }}{% if ticket.title %} {{ ticket.title }}{% endif %}</span> {% if ticket.get_status == 'Replied' %}(Open){% else %}({{ ticket.get_status }}){% endif %}</h3>
                 {% blocktrans with ticket.queue as queue and ticket.queue.organization.name as org %}
                 {{ org }}'s Queue: {{ queue }}{% endblocktrans %}
                 {% if ticket.property_milestones.count > 0 %}
@@ -84,7 +84,7 @@
         {% endif %}
 
         <tr><th colspan='2'>{% trans "Description" %}</th></tr>
-        <tr><td colspan='2'>{% if ticket.description %}{{ ticket.get_markdown|num_to_link }}{% else %}No description given.{% endif %}</td></tr>
+        <tr><td colspan='2'>{% if ticket.description %}{{ ticket.get_markdown|num_to_link }}{% else %}{% trans "No description given." %}{% endif %}</td></tr>
 
         {% if ticket.resolution %}
         <tr>
@@ -144,7 +144,7 @@
 
             {% ifequal ticket.status 5 %} <!-- Duplicate -->
             <dd><div class="form-group">
-                This ticket has been marked as a duplicate of another ticket. If you believe this is incorrect, please leave a comment.
+                {% trans "This ticket has been marked as a duplicate of another ticket. If you believe this is incorrect, please leave a comment." %}
                 <input type="hidden" name="new_status" value="2" />
             </div></dd>
             {% endifequal %}
@@ -161,7 +161,7 @@
             {% endif %}
             {% ifequal ticket.status 3 %}  <!-- Resolved -->
             <dd><div class="form-group">
-                If you are satisfied with the response, check this option to close the ticket.<br/>
+                {% trans "If you are satisfied with the response, check this option to close the ticket." %}<br/>
                 <label for='st_closed' class="radio-inline"><input type='checkbox' name='new_status' value='4' id='st_closed'> {% trans "Accept resolution and close (optional)" %}</label>
             </div></dd>
             {% endifequal %}
@@ -172,7 +172,7 @@
             {% endifequal %}
             {% ifequal ticket.status 6 %} <!-- Replied -->
             <dd><div class="form-group">
-                If you are satisfied with the response, check this option to close the ticket.<br/>
+                {% trans "If you are satisfied with the response, check this option to close the ticket." %}<br/>
                 <label for='st_closed' class="radio-inline"><input type='checkbox' name='new_status' value='4' id='st_closed'{% if not ticket.can_be_resolved %} disabled='disabled'{% endif %}> {% trans "Close ticket (optional)" %}</label>
             </div></dd>
             {% endifequal %}
@@ -191,7 +191,7 @@
                 <dd>
                     <div class="add_file_fields_wrap">
                         <div><label class='btn btn-primary btn-sm btn-file'>
-                                Browse... <input type="file" name='attachment' id='file0' style='display: none;'/>
+                            {% trans "Browse..." %} <input type="file" name='attachment' id='file0' style='display: none;'/>
                         </label><span>&nbsp;</span><span id='selectedfilename0'>{% trans 'No files selected.' %}</span></div>
                         <button class="add_file_field_button btn btn-success btn-xs">{% trans "Add Another File" %}</button>
                     </div>

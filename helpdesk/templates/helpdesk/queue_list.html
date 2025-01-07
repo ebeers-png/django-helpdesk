@@ -7,7 +7,7 @@
     <a href="{% url 'helpdesk:system_settings' %}">{% trans "System Settings" %}</a>
 </li>
 <li class="breadcrumb-item active">
-    Maintain Queues
+    {% trans "Maintain Queues" %}
 </li>
 {% endblock %}
 
@@ -26,7 +26,7 @@
         {% trans "Maintain Queues" %}
         <div class="flex-fill d-flex justify-content-end">
             <a class="btn btn-primary align-self-center" href="{% url 'helpdesk:create_queue' %}{{ user_info.url }}">
-                <i class="fa fa-plus mr-1"></i>Create
+                <i class="fa fa-plus mr-1"></i>{% trans "Create" %}
             </a>
         </div>
     </div>
@@ -114,7 +114,11 @@
         {% endif %}
         {% endwith %}
     </div>
-    <div class="card-footer small text-muted">Listing {{ queue_list|length }} queue(s) out of {{ queue_list.paginator.count }}.</div>
+    <div class="card-footer small text-muted">
+        {% blocktrans with queue_count=queue_list|length total_count=queue_list.paginator.count %}
+            Listing {{ queue_count }} queue(s) out of {{ total_count }}.
+        {% endblocktrans %}
+    </div>
 </div>
 
 {% endblock %}

@@ -7,9 +7,9 @@
 {% load organization_info %}
 {% organization_info user request as user_info %}
     <li class="breadcrumb-item">
-        <a href="{% url 'helpdesk:home' %}{{ user_info.url }}">Public</a>
+        <a href="{% url 'helpdesk:home' %}{{ user_info.url }}">{% trans "Public" %}</a>
     </li>
-    <li class="breadcrumb-item active">Create Ticket</li>
+    <li class="breadcrumb-item active">{% trans "Create Ticket" %}</li>
 {% endblock %}
 
 {% block helpdesk_body %}

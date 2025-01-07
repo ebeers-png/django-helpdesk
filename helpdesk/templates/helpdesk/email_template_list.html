@@ -7,11 +7,12 @@
     <a href="{% url 'helpdesk:system_settings' %}">{% trans "System Settings" %}</a>
 </li>
 <li class="breadcrumb-item active">
-    Email Templates
+    {% trans "Email Templates" %}
 </li>
 {% endblock %}
 
-{% block helpdesk_body %}{% blocktrans %}
+{% block helpdesk_body %}
+{% blocktrans %}
 <h2>Email Templates</h2>
 <p>Here you can edit email templates sent out from Helpdesk. They are triggered by specific actions, and so they cannot be created or deleted.</p>
 <div class="card card-primary">

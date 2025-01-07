@@ -7,19 +7,19 @@
         <div class="flex-fill d-flex justify-content-end">
             {% if  user.is_authenticated and user|is_helpdesk_staff %}
             <a class="btn btn-warning align-self-center mr-2" href="{% url 'helpdesk:edit_kb_article' category.slug item.id %}{{ user_info.url }}">
-                <i class="fa fa-pen mr-1"></i>Edit Article
+                <i class="fa fa-pen mr-1"></i>{% trans "Edit Article" %}
             </a>
             <a class="btn btn-danger align-self-center" data-toggle="modal" data-target="#deleteModal">
-                <i class="fa fa-trash mr-1"></i>Delete Article
+                <i class="fa fa-trash mr-1"></i>{% trans "Delete Article" %}
             </a>
             {% endif %}
         </div>
     </div>
     <a style="vertical-align:center" class="btn btn-secondary btn-sm{% if not prev_item %} disabled{% endif %}" href="{{ prev_item.get_absolute_url }}/{{ user_info.url }}" role="button">
-        <i class="fa fa-angle-double-left"></i> Previous Item
+        <i class="fa fa-angle-double-left"></i> {% trans "Previous Item" %}
     </a>
     <a class="btn btn-secondary btn-sm{% if not next_item %} disabled{% endif %}" href="{{ next_item.get_absolute_url }}/{{ user_info.url }}">
-        Next Item <i class="fa fa-angle-double-right"></i>
+        {% trans "Next Item" %} <i class="fa fa-angle-double-right"></i>
     </a>
 </div>
 {% endblock %}

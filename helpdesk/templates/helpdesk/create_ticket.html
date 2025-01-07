@@ -22,7 +22,7 @@
                 {% if user|is_helpdesk_staff %}
                 <div class="flex-fill d-flex justify-content-end">
                     <a class="btn btn-primary btn-sm float-right" href="{% url 'helpdesk:edit_form' form.form_id %}">
-                        <i class='fa fa-pen mr-2'></i>Edit
+                        <i class='fa fa-pen mr-2'></i>{% trans "Edit" %}
                     </a>
                 </div>
                 {% endif %}

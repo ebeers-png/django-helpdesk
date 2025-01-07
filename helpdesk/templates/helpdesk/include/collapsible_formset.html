@@ -14,7 +14,7 @@
 
 <div class="card shadow-sm mb-2">
     <div class="card-header">
-        <h4 class="card-title mb-0">Edit {{formset_title}}s</h4>
+        <h4 class="card-title mb-0">{% blocktrans %}Edit {{formset_title}}s{% endblocktrans %}</h4>
     </div>
     <div class="card-body">
         <div id="{{ formset_type }}_formset">
@@ -37,7 +37,7 @@
                                 <div class="btn-group">
                                     <button type="button" id="formcopy_{{ formset_type }}_{{ forloop.counter0 }}" class="btn btn-outline-secondary dropdown-toggle" data-toggle="dropdown" data-toggle="tooltip" title="Copy this {{ formset_title }} to another form.">
                                         <i class="fa fa-paste"></i>
-                                        <span>Copy to</span>
+                                        <span>{% trans "Copy to" %}</span>
                                     </button>
                                     <div class="dropdown-menu p-2">
                                         {% for formtype in copy_queryset %}
@@ -50,7 +50,7 @@
                                 <button type="button" id="duplicate_{{ formset_type }}_{{ forloop.counter0 }}" class="btn btn-outline-secondary" 
                                     onclick="duplicateForm('{{formset_type}}_{{ forloop.counter0 }}')" data-toggle="tooltip" title="Create a copy of this {{ formset_title }} inside this form.">
                                     <i class="fa fa-clone"></i>
-                                    <span>Duplicate</span>
+                                    <span>{% trans "Duplicate" %}</span>
                                 </button>
                                 {% endif %}
                             </div>
@@ -59,7 +59,7 @@
                                 <label id="delete_{{ formset_type }}_{{ forloop.counter0 }}" class="btn btn-outline-danger ml-2">
                                     <i class="fa fa-trash"></i>
                                     <input type="checkbox" autocomplete="off" onchange="deleteForm('{{ formset_type }}_{{ forloop.counter0 }}')">
-                                    <span>Delete</span>
+                                    <span>{% trans "Delete" %}</span>
                                 </label>
                             </div>
                             {% endif %}
@@ -78,7 +78,7 @@
                     <div class="d-flex">
                         <h5 class="mb-0">
                             <button id="button_{{ formset_type }}_empty" type="button" class="btn btn-link font-weight-bold" data-toggle="collapse" data-target="#collapse_{{ formset_type }}_empty">
-                                <i class="fa fa-caret-down mr-1"></i>New {{ formset_title }}
+                                <i class="fa fa-caret-down mr-1"></i>{% blocktrans %}New {{ formset_title }}{% endblocktrans %}
                             </button>
                         </h5>
                         <div class="flex-fill d-flex justify-content-end">
@@ -87,7 +87,7 @@
                                 <div class="btn-group">
                                     <button type="button" id="formcopy_{{ formset_type }}_empty" class="btn btn-outline-secondary dropdown-toggle" data-toggle="dropdown">
                                         <i class="fa fa-paste"></i>
-                                        <span>Copy to</span>
+                                        <span>{% trans "Copy to" %}</span>
                                     </button>
                                     <div class="dropdown-menu p-2">
                                         {% for formtype in copy_queryset %}
@@ -100,7 +100,7 @@
                                 <button type="button" id="duplicate_{{ formset_type }}_empty" class="btn btn-outline-secondary"
                                     onclick="duplicateForm('{{formset_type}}_empty')" data-toggle="tooltip" title="Create a copy of this {{ formset_title }} inside this form.">
                                     <i class="fa fa-clone"></i>
-                                    <span>Duplicate</span>
+                                    <span>{% trans "Duplicate" %}</span>
                                 </button>
                                 {% endif %}
                             </div>
@@ -109,7 +109,7 @@
                                 <label id="delete_{{ formset_type }}_empty" class="btn btn-outline-danger ml-2">
                                     <i class="fa fa-trash"></i>
                                     <input type="checkbox" autocomplete="off" onchange="deleteForm('{{ formset_type }}_empty')">
-                                    <span>Delete</span>
+                                    <span>{% trans "Delete" %}</span>
                                 </label>
                             </div>
                             {% endif %}
@@ -126,10 +126,10 @@
     </div>
     <div class="card-footer">
         <div class="d-flex align-items-center">
-            <small>
+            {% blocktrans %}<small>
                 Select delete on unused {{ formset_title }}s to have them removed when you save your changes.
             </br>
-            Improperly filled-out {{ formset_title }}s that are not set to be deleted may prevent you from saving your changes.
+            Improperly filled-out {{ formset_title }}s that are not set to be deleted may prevent you from saving your changes.{% endblocktrans %}
         </small>
         <div class="flex-fill justify-content-end">
             <button id="add_{{ formset_type }}" type="button" class="btn btn-primary float-right" onclick="addForm()">
