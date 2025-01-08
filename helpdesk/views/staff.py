@@ -366,7 +366,9 @@ def create_form(request):
                 'queue': formtype.queue,
                 'public': formtype.public,
                 'staff': formtype.staff,
-                'unlisted': formtype.unlisted
+                'unlisted': formtype.unlisted,
+                'prepopulate': formtype.prepopulate,
+                'prepopulation_cycle': formtype.prepopulation_cycle
             },
             initial_customfields = CustomField.objects.filter(ticket_form=formtype),
             organization = org,
@@ -392,6 +394,8 @@ def create_form(request):
             formtype.public = form.cleaned_data['public']
             formtype.staff = form.cleaned_data['staff']
             formtype.unlisted = form.cleaned_data['unlisted']
+            formtype.prepopulate = form.cleaned_data['prepopulate']
+            formtype.prepopulation_cycle = form.cleaned_data['prepopulation_cycle']
             formtype.save()
 
             if formset.is_valid():
@@ -418,6 +422,7 @@ def create_form(request):
                     customfield.public = cf['public']
                     customfield.column = cf['column']
                     customfield.lookup = cf['lookup']
+                    customfield.read_only = cf['read_only']
                     if not customfield.created: customfield.created = datetime.now()
                     customfield.modified = datetime.now()
                     customfield.ticket_form = formtype
@@ -449,6 +454,8 @@ def edit_form(request, pk):
                 'public': formtype.public,
                 'staff': formtype.staff,
                 'unlisted': formtype.unlisted,
+                'prepopulate': formtype.prepopulate,       
+                'prepopulation_cycle': formtype.prepopulation_cycle
             },
             initial_customfields=CustomField.objects.filter(ticket_form=formtype).prefetch_related('parent_fields'),
             organization=formtype.organization,
@@ -476,6 +483,8 @@ def edit_form(request, pk):
                     formtype.public = form.cleaned_data['public']
                     formtype.staff = form.cleaned_data['staff']
                     formtype.unlisted = form.cleaned_data['unlisted']
+                    formtype.prepopulate = form.cleaned_data['prepopulate']
+                    formtype.prepopulation_cycle = form.cleaned_data['prepopulation_cycle']
                     formtype.save()
 
                     if formset.is_valid():
@@ -504,6 +513,7 @@ def edit_form(request, pk):
                             customfield.public = cf['public']
                             customfield.column = cf['column']
                             customfield.lookup = cf['lookup']
+                            customfield.read_only = cf['read_only']
                             if not customfield.created: customfield.created = datetime.now()
                             customfield.modified = datetime.now()
                             customfield.ticket_form = formtype
@@ -3456,14 +3466,14 @@ def load_copy_to_beam(request, ticket_id):
         'properties_per_cycle': properties_per_cycle,
         'taxlots_per_cycle': taxlots_per_cycle,
         'debug': settings.DEBUG,
-    })
-
+    })    
 
 def get_building_data(request, ticket_id):
     """Given a cycle ID and view ID, loads ticket data and state data for the copy_to_beam page."""
     from seed.models import Cycle
     from seed.serializers.properties import PropertyStateSerializer
     from seed.serializers.taxlots import TaxLotStateSerializer
+    from helpdesk.lib import get_beam_state
 
     ticket = get_object_or_404(Ticket, id=ticket_id)
     if request.is_ajax and request.method == "GET":
@@ -3474,12 +3484,8 @@ def get_building_data(request, ticket_id):
         view_id = request.GET.get('view_id', 0)
 
         cycle = Cycle.objects.filter(organization=org, id=cycle_id).first()
-        if inventory_type == 'PropertyState':
-            view = PropertyView.objects.filter(state__organization=org, id=view_id).first()
-            state = PropertyStateSerializer(view.state).data
-        else:
-            view = TaxLotView.objects.filter(state__organization=org, id=view_id).first()
-            state = TaxLotStateSerializer(view.state).data
+        state = get_beam_state(org.id, view_id, inventory_type)
+        
         ticket_data = []
         beam_data = []
         if cycle:
@@ -3550,7 +3556,6 @@ def get_building_data(request, ticket_id):
             "ticket_data": ticket_data,
             'beam_data': beam_data
         }, status=200)
-
 
 def update_building_data(request, ticket_id):
     """

@@ -31,7 +31,7 @@ from helpdesk.email import create_ticket_cc
 from helpdesk.decorators import list_of_helpdesk_staff
 import re
 
-from seed.models import Column
+from seed.models import Column, Cycle
 
 logger = logging.getLogger(__name__)
 User = get_user_model()
@@ -83,6 +83,9 @@ class CustomFieldMixin(object):
         # if-elif branches start with special cases
         if field.data_type is None:
             fieldclass = forms.NullBooleanField
+        elif field.field_name == 'building_id' and kwargs.get('prepopulate', False):
+            fieldclass = forms.CharField
+            instanceargs['widget'] = PrepopulateFormInput(attrs={'class': 'form-control'})  
         elif field.data_type == 'varchar':
             fieldclass = forms.CharField
             instanceargs['max_length'] = field.max_length
@@ -155,7 +158,7 @@ class CustomFieldMixin(object):
                 raise NameError("Unrecognized data_type %s" % field.data_type)
 
         # Disable dependent fields by default
-        if field.parent_fields.all():
+        if field.parent_fields.all() or field.read_only:
             instanceargs['widget'].attrs['disabled'] = True
 
         # TODO change this
@@ -334,6 +337,9 @@ class AttachmentFileInputWidget(forms.ClearableFileInput):
 class ClearableFileInput(forms.ClearableFileInput):
     allow_multiple_selected = True # Must specify as of Django 3.2.19
     template_name = 'helpdesk/include/clearable_file_input.html'
+    
+class PrepopulateFormInput(forms.TextInput):
+    template_name = 'helpdesk/include/prepopulate_form_input.html'
 
 class EditKBItemForm(forms.ModelForm):
 
@@ -637,6 +643,10 @@ class EditFormTypeForm(forms.ModelForm):
             .exclude(table_name='') \
             .exclude(table_name=None) \
             .order_by('column_name')
+        
+        self.fields['prepopulation_cycle'].queryset = Cycle.objects.filter(organization_id=self.org) \
+                                                        .exclude(supercycle__isnull=False) \
+                                                        .order_by('end')
 
         self.copy_queryset = FormType.objects.filter(organization = self.org).exclude(pk=self.pk)
 
@@ -664,6 +674,7 @@ class EditFormTypeForm(forms.ModelForm):
                     'public': cf.public,
                     'column': cf.column,
                     'lookup': cf.lookup,
+                    'read_only': cf.read_only
                 })
                 if cf.parent_fields.count():
                     initial_depends_on[cf.id] = [{
@@ -1097,6 +1108,9 @@ class AbstractTicketForm(CustomFieldMixin, forms.Form):
 
             if self.form_queue:
                 queryset = queryset.exclude(field_name='queue')
+                
+            if FormType.objects.get(pk=self.form_id).prepopulate:
+                kwargs.update(prepopulate=True)
 
             for field in queryset:
                 if field.field_name in self.fields:
