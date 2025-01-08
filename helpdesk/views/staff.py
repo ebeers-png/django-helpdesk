@@ -524,7 +524,7 @@ def edit_form(request, pk):
                                     depends_on = dependent_field_form['id'] if dependent_field_form['id'] else DependsOn()
                                     depends_on.parent = dependent_field_form['parent']
                                     depends_on.dependent = dependent_field_form['dependent']
-                                    depends_on.parent_alert_text = dependent_field_form['parent_alert_text']
+                                    depends_on.parent_help_text = dependent_field_form['parent_help_text']
                                     depends_on.value = dependent_field_form['value']
 
                                     depends_on.save()
