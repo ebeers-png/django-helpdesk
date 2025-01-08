@@ -104,10 +104,14 @@
         {% trans "Export Tickets" %}
     </div>
     <div class="card-body">
-        <form method='post' action="{% url 'helpdesk:export_report' %}" id="ticket_mass_update">
+        <small>{% trans "Select a saved search to export tickets based on specific criteria, or choose 'Export All' to include all tickets in the export." %}</small>
+        <form method="post" action="{% url 'helpdesk:export_report' %}" id="ticket_mass_update">
             {% csrf_token %}
-            <select name='action' class="custom-select" style='width: 250px;'>
-                <option value='export_all'>{% trans 'Export All' %}</option>
+            <select name="action" class="custom-select" style="width: 250px;">
+                <option value="export_all">{% trans 'Export All' %}</option>
+                {% for q in user_saved_queries %}
+                    <option value="export_filtered_{{ q.id }}">{{ q.title }}</option>
+                {% endfor %}
             </select>
             <button type='submit' class='btn btn-primary btn-sm'>
                 <i class='fas fa-arrow-circle-right'></i> {% trans 'Go' %}
