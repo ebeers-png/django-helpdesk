@@ -2,13 +2,13 @@
 requires = ["setuptools"]
 build-backend = "setuptools.build_meta"
 
-[tool.setuptools]
-packages = ["helpdesk"]
+[tool.setuptools.packages.find]
+include = ["helpdesk*"]
 
 [project]
-name = "django-helpdesk"
+name = "beam-django-helpdesk"
 version = "0.3.0b3"
-description = "Helpdesk in Django"
+description = "Django-powered ticket tracker for your helpdesk"
 authors = [{name = "Ross Poulton", email = "ross@rossp.org"}]
 maintainers = [{name = "Garret Wassermann", email = "gwasser@gmail.com"}]
 license = {text = "BSD-3-Clause"}

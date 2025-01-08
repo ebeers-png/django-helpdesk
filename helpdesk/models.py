@@ -314,12 +314,13 @@ class Queue(models.Model):
 
     @property
     def from_address(self):
+        # todo update to use create_default_org?
         if self.importer:
             return self.importer.sender.from_address
         elif self.organization.sender:
             return self.organization.sender.from_address
         else:
-            return u'NO EMAIL ADDRESS DEFINED <%s>' % settings.DEFAULT_FROM_EMAIL
+            return u'NO EMAIL ADDRESS DEFINED <%s>' % settings.SERVER_EMAIL
 
     def prepare_permission_name(self):
         """Prepare internally the codename for the permission and store it in permission_name.
