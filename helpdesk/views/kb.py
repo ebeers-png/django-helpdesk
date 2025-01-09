@@ -427,7 +427,7 @@ def upload_attachment(request):
             return JsonResponse({
                 'uploaded': True,
                 'id': attach.id,
-                'url': attach.file.url  # todo: test with s3
+                'url': attach.download_attachment()
             })
     else:
         return JsonResponse({'uploaded': False, 'errors': form.errors})
