@@ -10,8 +10,6 @@ import logging
 from datetime import datetime, date, time
 from decimal import Decimal
 from operator import itemgetter
-import boto3
-from botocore.exceptions import ClientError
 
 from click.termui import hidden_prompt_func
 from django.core.exceptions import ObjectDoesNotExist, ValidationError
@@ -33,6 +31,7 @@ from helpdesk.decorators import list_of_helpdesk_staff
 import re
 
 from seed.models import Column
+from seed.utils.storage import get_media_url
 
 logger = logging.getLogger(__name__)
 User = get_user_model()
@@ -328,23 +327,11 @@ class EditKBCategoryForm(forms.ModelForm):
 class AttachmentFileInputWidget(forms.ClearableFileInput):
     template_name = 'helpdesk/include/attachment_input.html'
 
-def create_presigned_url(bucket_name, object_name, expiration=604800):
-    # Generate a presigned URL for the S3 object
-    s3_client = boto3.client('s3', region_name=settings.AWS_DEFAULT_REGION)
-    try:
-        response = s3_client.generate_presigned_url('get_object',
-                                                    Params={'Bucket': bucket_name,
-                                                            'Key': object_name},
-                                                    ExpiresIn=expiration)
-    except ClientError as e:
-        logging.error(e)
-        return None
-    # The response contains the presigned URL
-    return response
 
 class ClearableFileInput(forms.ClearableFileInput):
     allow_multiple_selected = True # Must specify as of Django 3.2.19
     template_name = 'helpdesk/include/clearable_file_input.html'
+
 
 class EditKBItemForm(forms.ModelForm):
 
@@ -396,10 +383,7 @@ class EditKBItemForm(forms.ModelForm):
 
         for form in self.attachment_formset.forms:
             form.fields['file'].widget.attrs.update({
-                'url': create_presigned_url(
-                    settings.AWS_STORAGE_BUCKET_NAME,
-                    form.initial['file'].name
-                ) if settings.USE_S3 is True else "/api/v3/media/" + form.initial['file'].name})
+                'url': get_media_url(form.initial['file'].name)})
             form.fields['file'].required = False
 
 

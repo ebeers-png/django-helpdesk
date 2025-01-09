@@ -19,9 +19,6 @@ from helpdesk import user
 from helpdesk.models import KBCategory, KBItem, KBIAttachment
 from helpdesk.decorators import is_helpdesk_staff, helpdesk_staff_member_required
 from helpdesk.forms import EditKBCategoryForm, EditKBItemForm
-from botocore.exceptions import ClientError
-import logging
-import boto3
 
 import datetime
 
@@ -34,20 +31,6 @@ def index(request):
         'helpdesk_settings': helpdesk_settings,
         'debug': settings.DEBUG,
     })
-
-def create_presigned_url(bucket_name, object_name, expiration=3600):
-    # Generate a presigned URL for the S3 object
-    s3_client = boto3.client('s3', region_name=settings.AWS_DEFAULT_REGION)
-    try:
-        response = s3_client.generate_presigned_url('get_object',
-                                                    Params={'Bucket': bucket_name,
-                                                            'Key': object_name},
-                                                    ExpiresIn=expiration)
-    except ClientError as e:
-        logging.error(e)
-        return None
-    # The response contains the presigned URL
-    return response
 
 
 def manage(request):
@@ -444,7 +427,7 @@ def upload_attachment(request):
             return JsonResponse({
                 'uploaded': True,
                 'id': attach.id,
-                'url': create_presigned_url(settings.AWS_STORAGE_BUCKET_NAME, f'{attach.file}') if settings.USE_S3 is True else attach.file.url
+                'url': attach.file.url  # todo: test with s3
             })
     else:
         return JsonResponse({'uploaded': False, 'errors': form.errors})
