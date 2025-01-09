@@ -32,6 +32,7 @@ def index(request):
         'debug': settings.DEBUG,
     })
 
+
 def manage(request):
     huser = user.huser_from_request(request)
 
@@ -423,8 +424,11 @@ def upload_attachment(request):
             attach.file = cf['file']
 
             attach.save()
-
-            return JsonResponse({'uploaded': True, 'id': attach.id, 'url': attach.file.url})
+            return JsonResponse({
+                'uploaded': True,
+                'id': attach.id,
+                'url': attach.download_attachment()
+            })
     else:
         return JsonResponse({'uploaded': False, 'errors': form.errors})
 
