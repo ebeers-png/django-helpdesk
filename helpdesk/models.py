@@ -2208,7 +2208,7 @@ class DependsOn(models.Model):
     dependent = models.ForeignKey(CustomField, blank=True, null=True, on_delete=models.CASCADE, related_name='parent_fields')
     value = models.TextField(
         _('Expected Value'),
-        help_text=_('Show field when the parent has this value. Use Yes or No when the parent field is a boolean (a checkbox).'),
+        help_text=_('Show field when the parent has this value. Use Yes or No when the parent field is a boolean (a checkbox). Not compatible with Attachment or Key Value parent fields.'),
         blank=True,
         null=True,
     )

@@ -10,6 +10,7 @@
     copy_url: (string) - django url name for the copy to function
     can_duplicate: (True | False) - show the duplicate button
     header_template: (string) - relative path to the template used for the section headers
+    help_text: (string) - text to show at the top of the card body, above the forms.
 {% endcomment %}
 
 <div class="card shadow-sm mb-2">
@@ -17,6 +18,7 @@
         <h4 class="card-title mb-0">Edit {{ formset_title }}s</h4>
     </div>
     <div class="card-body">
+        <p>{{ help_text }}</p>
         <div id="{{ formset_type }}_formset">
             {{ formset.management_form }}
             {% for form in formset %}
@@ -70,7 +72,7 @@
                     <div class="card-body">
                         {{ form|bootstrap4form }}
                         {% if  has_sub_formset %}
-                        {% include 'helpdesk/include/collapsible_formset.html' with formset=form.depends_on form_empty=form.form_empty has_sub_formset=False formset_title="Parent Field" formset_type=form.depends_on.formset_type required_fields="['parent', 'value']" can_copy=False can_duplicate=False header_template='helpdesk/include/header_customfields.html' only %}
+                        {% include 'helpdesk/include/collapsible_formset.html' with formset=form.depends_on form_empty=form.form_empty has_sub_formset=False formset_title="Parent Field" formset_type=form.depends_on.formset_type required_fields="['parent', 'value']" can_copy=False can_duplicate=False header_template='helpdesk/include/header_customfields.html' help_text='ALL parent fields must be set to their expected values for this field to be visible.' only %}
                         {% endif %}
                     </div>
                 </div>
