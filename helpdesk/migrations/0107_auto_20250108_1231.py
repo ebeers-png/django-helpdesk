@@ -7,7 +7,6 @@ import django.db.models.deletion
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('seed', '0269_alter_event_cycle'),
         ('helpdesk', '0106_dependson'),
     ]
 
