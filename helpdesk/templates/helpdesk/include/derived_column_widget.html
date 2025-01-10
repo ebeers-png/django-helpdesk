@@ -1,0 +1,27 @@
+<div class="input-group mb-3">
+    <input type="text" disabled id="{{widget.name}}_text" value="{{widget.value}}" {% include "django/forms/widgets/attrs.html" %}>
+    <div class="input-group-append" id="{{ widget.name }}_interact">
+        <button id="{{widget.name}}_evaluate" type="button" class="btn btn-primary">Evaluate</button>
+    </div>
+</div>
+<script>
+    $('#{{widget.name}}_evaluate').on('click', function() {
+        $('#{{widget.name}}_text').val('Loading...')
+
+        const data = new FormData(document.forms['ticket_submission_form'])
+        data.append('form_id', $('#{{widget.name}}_text').attr('data-form-id'))
+        data.append('derived_column_field', '{{widget.name}}')
+        data.append('building_id', document.getElementById('id_building_id')?.value)
+
+        $.ajax({
+          url: "{% url 'helpdesk:evaluate_derived_column' %}",
+          type: 'POST',
+          processData: false,
+          contentType: false,
+          data: data,
+          success: function (response) {
+            $('#{{widget.name}}_text').val(response.data)
+          }
+        })
+    });
+</script>

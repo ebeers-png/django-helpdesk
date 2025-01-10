@@ -269,6 +269,10 @@ urlpatterns += [
         public.view_ticket,
         name='public_view'),
 
+    url(r'^evaluate_derived_column/$',
+        public.evaluate_derived_column,
+        name='evaluate_derived_column'),
+
     url(r'^change_language/$',
         public.change_language,
         name='public_change_language'),

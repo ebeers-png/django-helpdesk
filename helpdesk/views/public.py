@@ -14,7 +14,7 @@ from django.core.exceptions import (
     ObjectDoesNotExist, PermissionDenied, ImproperlyConfigured,
 )
 from django.urls import reverse
-from django.http import HttpResponseRedirect
+from django.http import HttpResponseRedirect, JsonResponse
 from django.shortcuts import render, get_object_or_404
 from django.utils.http import urlquote
 from django.utils.translation import ugettext as _
@@ -30,7 +30,7 @@ from helpdesk.decorators import protect_view, is_helpdesk_staff
 import helpdesk.views.staff as staff
 import helpdesk.views.abstract_views as abstract_views
 from helpdesk.lib import text_is_spam
-from helpdesk.models import Ticket, UserSettings, CustomField, FormType, TicketCC, is_unlisted
+from helpdesk.models import Ticket, UserSettings, CustomField, FormType, TicketCC, is_extra_data, is_unlisted
 from helpdesk.user import huser_from_request
 
 logger = logging.getLogger(__name__)
@@ -332,6 +332,34 @@ def view_ticket(request):
         'debug': settings.DEBUG,
     })
 
+def evaluate_derived_column(request):
+    # building_id = request.POST.get('building_id', None)
+    form_id = request.POST.get('form_id', None)
+    derived_column_field = request.POST.get('derived_column_field', None)
+    derived_column_field = derived_column_field[2:] if derived_column_field[0:2] == 'e_' else derived_column_field
+
+    if form_id and derived_column_field:
+        form = FormType.objects.get(pk=form_id)
+        column = form.customfield_set.get(field_name=derived_column_field).column
+        if column.derived_column:
+            parameters = {}
+            fields = form.customfield_set.exclude(field_name=derived_column_field).exclude(column__isnull=True).select_related('column')
+            for field in fields:
+                field_name = 'e_' + field.field_name if is_extra_data(field.field_name) else field.field_name
+                value = request.POST.get(field_name, None)
+                parameters[field.column.column_name] = value
+
+            # breakpoint()
+
+            return JsonResponse({
+                'status': 'success',
+                'data': column.derived_column.evaluate(column_parameters=parameters)
+            })
+
+        return JsonResponse({
+            'status': 'error',
+            'error': 'No derived column found'
+        })
 
 def change_language(request):
     return_to = ''

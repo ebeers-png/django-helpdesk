@@ -2109,6 +2109,7 @@ class CustomField(models.Model):
         ('slug', _('Slug')),
         ('attachment', _('Attachment')),
         ('key_value', _('Key Value')),
+        ('derived_column', _('Derived Column'))
     )
 
     data_type = models.CharField(

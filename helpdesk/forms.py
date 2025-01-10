@@ -137,6 +137,9 @@ class CustomFieldMixin(object):
 
             instanceargs['key_field'] = forms.ChoiceField(choices=choices, widget=key_widget)
             instanceargs['value_field'] = forms.CharField(widget=value_widget)
+        elif field.data_type == 'derived_column':
+            fieldclass = forms.CharField
+            instanceargs['widget'] = DerivedColumnInput(attrs={'class': 'form-control', 'data-form-id': self.form_id})
         else:
             # Try to use the immediate equivalences dictionary
             try:
@@ -340,6 +343,9 @@ class ClearableFileInput(forms.ClearableFileInput):
     
 class PrepopulateFormInput(forms.TextInput):
     template_name = 'helpdesk/include/prepopulate_form_input.html'
+
+class DerivedColumnInput(forms.TextInput):
+    template_name = 'helpdesk/include/derived_column_widget.html'
 
 class EditKBItemForm(forms.ModelForm):
 
@@ -554,7 +560,7 @@ class EditFormTypeForm(forms.ModelForm):
 
             def label_from_instance(self, column):
                 display = column.display_name if column.display_name else column.column_name
-                return "%s (%s)" % (display, column.table_name)
+                return "%s (%s)" % (display, column.table_name) + (' - Derived' if column.derived_column else '')
 
         def clean(self):
             # ticket_form is an excluded field, so must validate unique_together manually
@@ -695,14 +701,14 @@ class EditFormTypeForm(forms.ModelForm):
             defaults = ['queue','submitter_email', 'contact_name', 'contact_email', 'title','description','building_name','building_address','building_id','pm_id','attachment','due_date','priority','cc_emails', 'empty']
 
             self.form_empty = self.customfield_formset.empty_form
-            self.form_empty.fields['column'] = EditFormTypeForm.BaseCustomFieldFormSet.ColumnModelChoiceField(queryset=column_queryset)
+            self.form_empty.fields['column'] = EditFormTypeForm.BaseCustomFieldFormSet.ColumnModelChoiceField(queryset=column_queryset, help_text=_('Select a derived column if the data type is derived column.'))
             self.form_empty.fields['agg_list_values'] = forms.JSONField(widget=forms.HiddenInput(), required=False)
             self.form_empty.fields['list_values'] = MatchOnField(num_widgets=1, field_type=forms.CharField(), widget_type=forms.TextInput(), required=False)
             self.form_empty.depends_on = self.DependsOnFormSet()
             self.form_empty.form_empty = self.form_empty.depends_on.empty_form
 
             for form_indx, form in enumerate(self.customfield_formset.forms):
-                form.fields['column'] = EditFormTypeForm.BaseCustomFieldFormSet.ColumnModelChoiceField(queryset=column_queryset)
+                form.fields['column'] = EditFormTypeForm.BaseCustomFieldFormSet.ColumnModelChoiceField(queryset=column_queryset, help_text=_('Select a derived column if the data type is derived column.'))
                 form.fields['agg_list_values'] = forms.JSONField(widget=forms.HiddenInput(), required=False)
                 form.fields['list_values'] = MatchOnField(num_widgets=list_val_lens[form_indx] + 1, field_type=forms.CharField(), widget_type=forms.TextInput(), required=False)
 
