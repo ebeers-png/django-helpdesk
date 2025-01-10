@@ -1,11 +1,11 @@
 <div class="input-group mb-3">
-    <input type="text" class="form-control" id="{{widget.name}}_text" value="{{widget.value}}">
+    <input type="text" class="form-control" id="id_{{widget.name}}" value="{{widget.value}}">
     <div class="input-group-append" id="{{ widget.name }}_interact">
         <button id="{{widget.name}}_prepopulate" type="button" class="btn btn-primary">Prepopulate</button>
     </div>
 </div>
 <script>
     $('#{{widget.name}}_prepopulate').on('click', function() {
-        window.location = window.location.origin + window.location.pathname + '?e_building_id=' + $('#{{widget.name}}_text').val()
+        window.location = window.location.origin + window.location.pathname + '?e_building_id=' + $('#id_{{widget.name}}').val()
     });
 </script>
