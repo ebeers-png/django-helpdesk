@@ -72,7 +72,7 @@
                     <div class="card-body">
                         {{ form|bootstrap4form }}
                         {% if  has_sub_formset %}
-                        {% include 'helpdesk/include/collapsible_formset.html' with formset=form.depends_on form_empty=form.form_empty has_sub_formset=False formset_title="Parent Field" formset_type=form.depends_on.formset_type required_fields="['parent', 'value']" can_copy=False can_duplicate=False header_template='helpdesk/include/header_customfields.html' help_text='ALL parent fields must be set to their expected values for this field to be visible.' only %}
+                        {% include 'helpdesk/include/collapsible_formset.html' with formset=form.depends_on form_empty=form.form_empty has_sub_formset=False formset_title="Parent Field" formset_type=form.depends_on.formset_type required_fields="['parent', 'value']" can_copy=False can_duplicate=False header_template='helpdesk/include/header_customfields.html' help_text='ALL parent fields must be set to their expected values for this field to be visible. Do not set the same field as a parent multiple times.' only %}
                         {% endif %}
                     </div>
                 </div>
