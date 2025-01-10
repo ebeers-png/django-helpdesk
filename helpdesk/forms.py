@@ -803,6 +803,24 @@ class AbstractTicketForm(CustomFieldMixin, forms.Form):
 
     def clean(self):
         cleaned_data = super(AbstractTicketForm, self).clean()
+        
+        # remove errors for dependent fields that were not visible
+        for field in list(self.errors.keys()):
+            errors = self.errors[field]
+            required_error = any([error for error in errors if 'required' in error][0])
+            parents = self.dependent_to_parents.get(field, None)
+            if required_error and parents:
+                required = True
+                for parent in parents:
+                    value = cleaned_data.get(parent['field_name'], None)
+                    if isinstance(value, bool):
+                        value = 'Yes' if value else 'No'
+
+                    if value != parent['value']:
+                        required = False
+
+                if not required:
+                    del self._errors[field]
 
         # for hidden fields required by helpdesk code, like description
         for field, type_ in self.hidden_fields:
