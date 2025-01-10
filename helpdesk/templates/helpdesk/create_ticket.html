@@ -134,6 +134,7 @@
                 let parent_input = $(`#id_${parent.field_name}`)
                 let parent_element = $(`#id_group_${parent.field_name}`)
                 
+                let value = parent_input.val()
                 if (parent_input.attr('type') == 'checkbox') {
                     value = parent_input.prop('checked') ? 'Yes' : 'No'
                 }
