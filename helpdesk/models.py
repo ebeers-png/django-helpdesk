@@ -2214,20 +2214,23 @@ class CustomField(models.Model):
     def get_markdown(self):
         return get_markdown(self.help_text, self.ticket_form.organization)
 
+
 class DependsOn(models.Model):
     parent = models.ForeignKey(CustomField, blank=True, null=True, on_delete=models.CASCADE, related_name='dependent_fields')
     dependent = models.ForeignKey(CustomField, blank=True, null=True, on_delete=models.CASCADE, related_name='parent_fields')
-    parent_alert_text = models.TextField(
-        _('Parent Alert Text'),
-        help_text=_('Shown to the User in the Parent CustomField when it has a specific value'),
-        blank=True,
-        null=True
-    )
     value = models.TextField(
-        _('Comparison Value, use Yes / No for boolean values'),
+        _('Expected Value'),
+        help_text=_('Show field when the parent has this value. Use Yes or No when the parent field is a boolean (a checkbox). Not compatible with Attachment or Key Value parent fields.'),
         blank=True,
         null=True,
     )
+    parent_help_text = models.TextField(
+        _('Parent Help Text'),
+        help_text=_('This text will display under the parent field when the dependent field is visible.'),
+        blank=True,
+        null=True
+    )
+
 
 @receiver(pre_save, sender=DependsOn)
 def detect_circular_dependencies(instance: DependsOn, **kwargs):

@@ -597,7 +597,7 @@ class EditFormTypeForm(forms.ModelForm):
             return sub_formset_post
 
     DependsOnFormSet = forms.inlineformset_factory(CustomField, DependsOn, formset=BaseDependsOnFormSet,
-        fields=['id', 'parent', 'dependent', 'parent_alert_text', 'value'],
+        fields=['id', 'parent', 'dependent', 'value', 'parent_help_text'],
         fk_name='dependent',
     )
 
@@ -610,13 +610,13 @@ class EditFormTypeForm(forms.ModelForm):
         prefix = f'customfield{form_indx}dependentfields_set-'
         for depends_on_index, form_depends_on in enumerate(depends_on.forms):
             form_depends_on.fields['parent'] = parent_field
-            form_depends_on.fields['parent_alert_text'].widget.attrs['style'] = 'height:40px'
+            form_depends_on.fields['parent_help_text'].widget.attrs['style'] = 'height:40px'
             form_depends_on.fields['value'].widget.attrs['style'] = 'height:40px'
             form_depends_on.prefix = f'{prefix}{depends_on_index}'
 
         form_empty = depends_on.empty_form
         form_empty.fields['parent'] = parent_field
-        form_empty.fields['parent_alert_text'].widget.attrs['style'] = 'height:40px'
+        form_empty.fields['parent_help_text'].widget.attrs['style'] = 'height:40px'
         form_empty.fields['value'].widget.attrs['style'] = 'height:40px'
         form_empty.prefix = f'{prefix}__prefix__'
         return depends_on, form_empty
@@ -681,7 +681,7 @@ class EditFormTypeForm(forms.ModelForm):
                         'id': dcf.id,
                         'parent': dcf.parent,
                         'dependent': cf.id,
-                        'parent_alert_text': dcf.parent_alert_text,
+                        'parent_help_text': dcf.parent_help_text,
                         'value': dcf.value
                     } for dcf in cf.parent_fields.all()]
                 if cf.list_values:
@@ -804,8 +804,7 @@ class AbstractTicketForm(CustomFieldMixin, forms.Form):
             if hasattr(field, 'dependent_fields'): # DependsOn instances where this field is the parent
                 dependents = field.dependent_fields.all()
                 for dependent in dependents:
-                    alert_prefix = dependent.dependent.label if dependent.dependent.label else dependent.dependent.field_name
-                    alert_text = f'{alert_prefix}: {dependent.parent_alert_text}' if dependent.parent_alert_text else None
+                    alert_text = f'{dependent.parent_help_text}' if dependent.parent_help_text else None
                     dependent_data = {
                         'field_name': extra_data_name(dependent.dependent.field_name), 
                         'value': dependent.value, 
@@ -815,6 +814,24 @@ class AbstractTicketForm(CustomFieldMixin, forms.Form):
 
     def clean(self):
         cleaned_data = super(AbstractTicketForm, self).clean()
+        
+        # remove errors for dependent fields that were not visible
+        for field in list(self.errors.keys()):
+            errors = self.errors[field]
+            required_error = any([error for error in errors if 'required' in error][0])
+            parents = self.dependent_to_parents.get(field, None)
+            if required_error and parents:
+                required = True
+                for parent in parents:
+                    value = cleaned_data.get(parent['field_name'], None)
+                    if isinstance(value, bool):
+                        value = 'Yes' if value else 'No'
+
+                    if value != parent['value']:
+                        required = False
+
+                if not required:
+                    del self._errors[field]
 
         # for hidden fields required by helpdesk code, like description
         for field, type_ in self.hidden_fields:

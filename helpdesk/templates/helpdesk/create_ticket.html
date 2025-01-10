@@ -135,7 +135,7 @@
                 let parent_element = $(`#id_group_${parent.field_name}`)
                 
                 let value = parent_input.val()
-                if (parent_input.prop('checked') != undefined) {
+                if (parent_input.attr('type') == 'checkbox') {
                     value = parent_input.prop('checked') ? 'Yes' : 'No'
                 }
                 show &&= value == parent.value && !parent_element.attr('hidden')
