@@ -644,7 +644,7 @@ class EditFormTypeForm(forms.ModelForm):
             .exclude(table_name=None) \
             .order_by('column_name')
         
-        self.fields['prepopulation_cycle'].queryset = Cycle.objects.filter(organization_id=self.org) \
+        self.fields['pull_cycle'].queryset = Cycle.objects.filter(organization_id=self.org) \
                                                         .exclude(supercycle__isnull=False) \
                                                         .order_by('end')
 

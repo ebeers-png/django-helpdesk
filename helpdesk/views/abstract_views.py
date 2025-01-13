@@ -1,6 +1,6 @@
 from django.db.models import Q
 from helpdesk.models import CustomField, KBItem, Queue, FormType
-from helpdesk.lib import get_beam_state, map_form_fields_to_state_data
+from helpdesk.lib import find_beam_view, get_beam_state, map_form_fields_to_state_data
 from seed.models import PropertyView, TaxLotView
 
 
@@ -22,22 +22,13 @@ class AbstractCreateTicketMixin():
         query_param_fields += custom_fields
         
         ## Prepopulate form from ID
-
         form = FormType.objects.get(pk=self.form_id)
         building_id_field = form.customfield_set.filter(field_name='building_id').exclude(column__isnull=True).select_related('column').first()
         building_id = request.GET.get('e_building_id', None)
-        if building_id and form.prepopulate and form.prepopulation_cycle and building_id_field:
+        if building_id and form.prepopulate and form.pull_cycle and building_id_field:
             org_id = form.organization_id
             column = building_id_field.column
-            if column.is_extra_data:
-                lookup = Q(**{f'state__extra_data__{column.column_name}': building_id})
-            else: 
-                lookup = Q(**{f'state__{column.column_name}': building_id})
-            
-            if column.table_name == 'PropertyState':
-                view = PropertyView.objects.filter( lookup, cycle_id=form.prepopulation_cycle_id, ).first()
-            else: 
-                view = TaxLotView.objects.filter( lookup, cycle_id=form.prepopulation_cycle_id, ).first()
+            view = find_beam_view(org_id, form.pull_cycle.id, column, building_id)
             
             if view:
                 state = get_beam_state(org_id, view.id, column.table_name)

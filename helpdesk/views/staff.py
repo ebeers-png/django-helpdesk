@@ -368,7 +368,7 @@ def create_form(request):
                 'staff': formtype.staff,
                 'unlisted': formtype.unlisted,
                 'prepopulate': formtype.prepopulate,
-                'prepopulation_cycle': formtype.prepopulation_cycle
+                'pull_cycle': formtype.pull_cycle
             },
             initial_customfields = CustomField.objects.filter(ticket_form=formtype),
             organization = org,
@@ -395,7 +395,7 @@ def create_form(request):
             formtype.staff = form.cleaned_data['staff']
             formtype.unlisted = form.cleaned_data['unlisted']
             formtype.prepopulate = form.cleaned_data['prepopulate']
-            formtype.prepopulation_cycle = form.cleaned_data['prepopulation_cycle']
+            formtype.pull_cycle = form.cleaned_data['pull_cycle']
             formtype.save()
 
             if formset.is_valid():
@@ -455,7 +455,7 @@ def edit_form(request, pk):
                 'staff': formtype.staff,
                 'unlisted': formtype.unlisted,
                 'prepopulate': formtype.prepopulate,       
-                'prepopulation_cycle': formtype.prepopulation_cycle
+                'pull_cycle': formtype.pull_cycle
             },
             initial_customfields=CustomField.objects.filter(ticket_form=formtype).prefetch_related('parent_fields'),
             organization=formtype.organization,
@@ -484,7 +484,7 @@ def edit_form(request, pk):
                     formtype.staff = form.cleaned_data['staff']
                     formtype.unlisted = form.cleaned_data['unlisted']
                     formtype.prepopulate = form.cleaned_data['prepopulate']
-                    formtype.prepopulation_cycle = form.cleaned_data['prepopulation_cycle']
+                    formtype.pull_cycle = form.cleaned_data['pull_cycle']
                     formtype.save()
 
                     if formset.is_valid():
