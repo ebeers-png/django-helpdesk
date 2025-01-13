@@ -12,6 +12,9 @@ from mimetypes import guess_type
 from django.conf import settings
 from django.utils.encoding import smart_text
 from helpdesk.models import FollowUpAttachment, FormType, is_extra_data
+from seed.serializers.properties import PropertyStateSerializer
+from seed.serializers.taxlots import TaxLotStateSerializer
+from seed.models import PropertyView, TaxLotView
 
 logger = logging.getLogger(__name__)
 
@@ -180,11 +183,28 @@ def format_time_spent(time_spent):
         time_spent = ""
     return time_spent
 
+def find_beam_view(org_id, cycle_id, column, unique_id):
+    """
+    Find a BEAM inventory view with a unique identifying value
+
+    :param org_id: ID of organization to search in
+    :param cycle_id: ID of cycle to search in
+    :param column: Column object containing unique identifier to lookup
+    :param unique_id: value to search for in the Column
+    """
+    from django.db.models import Q
+
+    if column.is_extra_data:
+        lookup = Q(**{f'state__extra_data__{column.column_name}': unique_id})
+    else: 
+        lookup = Q(**{f'state__{column.column_name}': unique_id})
+    
+    if column.table_name == 'PropertyState':
+        return PropertyView.objects.filter(lookup, property__organization_id=org_id, cycle_id=cycle_id).first()
+    else: 
+        return TaxLotView.objects.filter(lookup, property__organization_id=org_id, cycle_id=cycle_id).first()
+
 def get_beam_state(org_id, view_id, inventory_type):
-    from seed.serializers.properties import PropertyStateSerializer
-    from seed.serializers.taxlots import TaxLotStateSerializer
-    from seed.models import Column, PropertyView, TaxLotView
-     
     if inventory_type == 'PropertyState':
         view = PropertyView.objects.filter(state__organization_id=org_id, id=view_id).first()
         state = PropertyStateSerializer(view.state).data

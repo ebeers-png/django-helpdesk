@@ -400,8 +400,8 @@ class FormType(models.Model):
                                                '(If the "public" option is checked, this form will still be accessible by everyone through the link.)'))
     prepopulate=models.BooleanField(_('Prepopulate Form?'), blank=False, default=False,
                                     help_text=_('Should this form allow prepopulation from a building ID?'))
-    prepopulation_cycle=models.ForeignKey(Cycle, on_delete=models.SET_NULL, null=True, blank=True,
-                                    help_text=_('BEAM Cycle to pull property data from. Required if prepopulate is checked.'))
+    pull_cycle=models.ForeignKey(Cycle, on_delete=models.SET_NULL, null=True, blank=True,
+                                    help_text=_('BEAM Cycle to pull property data from. Required if prepopulate is checked or using derived column fields.'))
 
     # Add Preset Form Fields to the Database, avoiding having to run a PSQL command in another terminal window.
     # This will happen automatically upon FormType Creation
