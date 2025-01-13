@@ -62,6 +62,89 @@ def create_ticket(request, form_id=None,  *args, **kwargs, ):
         else:
             return HttpResponseRedirect(reverse('helpdesk:home'))
 
+def ticket_list_owner(request):
+    ticket_org = request.user.default_organization.helpdesk_organization.name
+    submitter_email = request.user.email
+    open_tickets = Ticket.objects.exclude(Q(status=Ticket.DUPLICATE_STATUS) | Q(status=Ticket.RESOLVED_STATUS) | Q(status=Ticket.CLOSED_STATUS)).filter(submitter_email__iexact=submitter_email)
+    resolved_tickets = Ticket.objects.filter(Q(status=Ticket.DUPLICATE_STATUS) | Q(status=Ticket.RESOLVED_STATUS) | Q(status=Ticket.CLOSED_STATUS), submitter_email__iexact=submitter_email)
+    cc_tickets = TicketCC.objects.filter(user=request.user)
+
+    if request.GET and 'q' in request.GET:
+        search_query = request.GET.get('q')
+        # Todo: search in followups
+        open_tickets = open_tickets.filter(Q(title__icontains=search_query) | Q(description__icontains=search_query))
+        resolved_tickets = resolved_tickets.filter(Q(title__icontains=search_query) | Q(description__icontains=search_query))
+        cc_tickets = cc_tickets.filter(Q(ticket__title__icontains=search_query) | Q(ticket__description__icontains=search_query))
+    
+    return render(request, 'helpdesk/ticket_list_owner.html', {
+        'submitted_tickets': open_tickets,
+        'completed_tickets': resolved_tickets,
+        'cc_tickets': cc_tickets
+    })
+
+def ticket_detail(request, ticket_id):
+    ticket_org = request.user.default_organization.helpdesk_organization.name
+    user_email = request.user.email
+    ticket = Ticket.objects.get(id=ticket_id)
+
+    # Search for email in the two default email fields
+    email_lower = user_email.casefold()
+    emails = {ticket.submitter_email, ticket.contact_email}
+    emails.discard(None)
+    if email_lower not in {e.casefold() for e in emails}:
+        # Search for email in ticket's CCs
+        ticket_cc_emails = TicketCC.objects.filter(
+            Q(ticket=ticket),
+            Q(can_view=True) | Q(can_update=True)
+        ).values_list('email', flat=True)
+        emails.update(ticket_cc_emails)
+        emails.discard(None)
+
+        if email_lower not in {e.casefold() for e in emails}:
+            # Search for email in the ticket's extra_data email fields that can receive notifications
+            ticket_email_fields = CustomField.objects.filter(
+                ticket_form=ticket.ticket_form,
+                data_type='email',
+                notifications=True
+            ).values_list('field_name', flat=True)
+            ticket_email_extra_data_values = [v for k, v in ticket.extra_data.items() if k in ticket_email_fields]
+            emails.update(ticket_email_extra_data_values)
+            emails.discard(None)
+            # Otherwise, not allowed
+            if email_lower not in {e.casefold() for e in emails}:
+                return search_for_ticket(request, _('Invalid ticket ID or e-mail address. Please try again.'),
+                                         ticket=ticket)
+
+    cc_user = TicketCC.objects.filter(ticket=ticket, email=user_email).first()
+    # Redirect CC User to Homepage if they aren't allowed to view the ticket
+    if cc_user and not cc_user.can_view:
+        return render(request, 'helpdesk/public_error.html', {
+            'error_message': TicketCC.VIEW_WARNING % (ticket.submitter_email if ticket.submitter_email else ''),
+            'ticket': ticket,
+            'debug': settings.DEBUG,
+        })
+    elif cc_user and cc_user.can_view:
+        can_update = cc_user.can_update
+    elif user_email == ticket.submitter_email:
+        can_update = True
+
+    extra_display = CustomField.objects.filter(ticket_form=ticket.ticket_form).values()
+    extra_data = []
+    for field in extra_display:
+        if field['public'] and not is_unlisted(field['field_name']) and not field['data_type'] == 'attachment':
+            if field['field_name'] in ticket.extra_data:
+                field['value'] = ticket.extra_data[field['field_name']]
+            else:
+                field['value'] = getattr(ticket, field['field_name'], None)
+            extra_data.append(field)
+
+    return render(request, 'helpdesk/ticket_detail.html', {
+        'ticket': ticket,
+        'helpdesk_settings': helpdesk_settings,
+        'extra_data': extra_data,
+        'can_update': can_update,
+        'debug': settings.DEBUG,
+    })
 
 class BaseCreateTicketView(abstract_views.AbstractCreateTicketMixin, FormView):
     form_id = None
@@ -320,7 +403,7 @@ def view_ticket(request):
             else:
                 field['value'] = getattr(ticket, field['field_name'], None)
             extra_data.append(field)
-
+    breakpoint()
     return render(request, 'helpdesk/public_view_ticket.html', {
         'key': key,
         'mail': email,
