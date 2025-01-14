@@ -22,7 +22,7 @@
         <div class="panel-body"><h2>{% blocktrans %} {{ action }} Form {% endblocktrans %}</h2>
             <p>
                 {% if action == "Create" %}{% trans "Leaving this page without using the cancel button will create a blank unnamed form." %}</br>{% endif %}
-                
+
                 {% trans "Required fields are indicated by " %} <span style="color:red;">*</span>
             </p>
             {% if form.errors %}<p class="text-danger">{% for error in form.errors %}{% trans "Error: " %}{{ error }}<br>{% endfor %}</p>{% endif %}
@@ -32,7 +32,7 @@
                 <strong>Custom Field Error</strong>: {{ formset.non_form_errors.as_text }}
             </div>
             {% endif %}
-            
+
             {% if formset.errors %}
             {% for form_errors in formset.errors %}
             {% if form_errors %}
@@ -48,7 +48,7 @@
                 {% csrf_token %}
                 <fieldset>
                     {{ form|bootstrap4form }}
-                    {% include 'helpdesk/include/collapsible_formset.html' with formset=form.customfield_formset formset_title="Custom Field" formset_type="custom_field" required_fields="['field_name']" can_copy=True copy_queryset=form.copy_queryset copy_url='helpdesk:copy_field' can_duplicate=True header_template='helpdesk/include/header_customfields.html'%}
+                    {% include 'helpdesk/include/collapsible_formset.html' with formset=form.customfield_formset form_empty=form.form_empty has_sub_formset=True parent_id=0 formset_title="Custom Field" formset_type="custom_field" required_fields="['field_name']" can_copy=True copy_queryset=form.copy_queryset copy_url='helpdesk:copy_field' can_duplicate=True header_template='helpdesk/include/header_customfields.html'%}
                     <div class='buttons form-group'>
                         <button type='submit' id='submit' onclick="removeEmpty(); aggMultiText()" class="btn btn-primary btn" value='{% trans "Save Changes" %}'>
                             {% if action == "Create" %}
@@ -80,24 +80,25 @@
                 field_name.required = true;
             }
         }
-        
+
         document.querySelector('#custom_field_empty [name$="-field_name"]').required = false;
-        
+
         {# Bandaid fix for adding asterisks to required fields while the rest of the form is handled by bootstrap4form #}
         for (const required_field of document.querySelectorAll('[required]')) {
             document.querySelector('label[for=' + required_field.id + ']').innerHTML += '<span style="color:red;">*</span>'
         }
-        
+
+        var id_formset = 'id_customfield_set';
         // Update field visibility depending on the selected data type for the field
         for (const dataTypeField of document.querySelectorAll('[id^=' + id_formset + '-][id$=-data_type]')) {
             formNum = dataTypeField.id.match(new RegExp(`${id_formset}-(\\w+)`))[1];
             updateDataTypeFields(formNum)
             dataTypeField.addEventListener('change', (e) => {updateDataTypeFields(e.srcElement.id.match(new RegExp(`${id_formset}-(\\w+)`))[1])});
         }
-        
+
         $('[id^=colsearch_]').on('input', debounced())
     })
-    
+
     function removeEmpty() {
         if (document.querySelector('#edit_form').checkValidity()) {
             document.querySelector('#custom_field_empty').remove()
@@ -114,13 +115,16 @@
             agg.value = JSON.stringify(agg_strings)
         }
     }
-    
-    function addScript(newForm) {
+
+    function addScript(id_formset, newForm) {
         dataTypeField = newForm.querySelector('[id$=-data_type]')
+        if (!dataTypeField) {
+            return;
+        }
         formNum = dataTypeField.id.match(new RegExp(`${id_formset}-(\\w+)`))[1];
         updateDataTypeFields(formNum)
         dataTypeField.addEventListener('change', (e) => {updateDataTypeFields(e.srcElement.id.match(new RegExp(`${id_formset}-(\\w+)`))[1])});
-    
+
         newForm.querySelector("[id$=_add_string]").addEventListener('click', function() {
             widgetName = "customfield_set-" + formNum + "-list_values"
             // Create new input element and append it to the input container
@@ -144,19 +148,19 @@
         }
         agg.value = JSON.stringify(agg_strings)
     }
-    
+
     function updateDataTypeFields(formNum) {
         if (formNum == "__prefix__") {formNum = "empty"}
         form = document.getElementById('custom_field_' + formNum)
         dataType = form.querySelector('[id$=-data_type]').value
-        
+
         // Hide all conditionally visible fields and recheck conditions
         form.querySelector('[id$=-max_length]').parentElement.parentElement.hidden = true;
         form.querySelector('[id$=-decimal_places]').parentElement.parentElement.hidden = true;
         form.querySelector('[id$=-empty_selection_list]').parentElement.parentElement.hidden = true;
         form.querySelector('[id$=-list_values]').parentElement.parentElement.hidden = true;
         form.querySelector('[id$=-notifications]').parentElement.parentElement.hidden = true;
-        
+
         if (['varchar', 'text', 'decimal'].indexOf(dataType) >= 0) {
             form.querySelector('[id$=-max_length]').parentElement.parentElement.hidden = false;
         }
@@ -175,7 +179,7 @@
             form.querySelector('[id$=-notifications]').parentElement.parentElement.hidden = false;
         }
     }
-</script>   
+</script>
 {% include 'helpdesk/include/edit_md_preview_script.html' %}
-{% include 'helpdesk/include/searchable_select_script.html' %}  
+{% include 'helpdesk/include/searchable_select_script.html' %}
 {% endblock %}

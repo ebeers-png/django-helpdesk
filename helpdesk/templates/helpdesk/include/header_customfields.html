@@ -1,2 +1,23 @@
-{% if form.label.value %}{{ form.label.value}}{% elif form.field_name.value %}{{ form.field_name.value }}{% else %}{{formset_title}} #{{forloop.counter}}{% endif %}
-- {{ form.data_type.value }}{% if form.required.value %}*{% endif %}
+{% if form.label.value %}
+    {{ form.label.value}}
+{% elif form.field_name.value %}
+    {{ form.field_name.value }}
+{% else %}
+    {{ formset_title }} #{{ forloop.counter }}
+{% endif %}
+{% if form.data_type %}
+    - {{ form.data_type.value }}
+{% elif form.parent.value %}
+    -
+    {% if form.parent.initial.label %}
+        {{ form.parent.initial.label }}
+    {% elif form.parent.initial.field_name %}
+        {{ form.parent.initial.field_name }}
+    {% else %}
+        #{{ forloop.counter }}
+    {% endif %}
+
+{% endif %}
+{% if form.required.value %}
+    *
+{% endif %}
