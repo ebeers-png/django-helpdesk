@@ -155,7 +155,7 @@ class CustomFieldMixin(object):
                 raise NameError("Unrecognized data_type %s" % field.data_type)
 
         # Disable dependent fields by default
-        if field.parent_fields.all():
+        if field.parent_fields.all() and not kwargs.get('edit', False):
             instanceargs['widget'].attrs['disabled'] = True
 
         # TODO change this
@@ -197,6 +197,9 @@ class EditTicketForm(CustomFieldMixin, forms.ModelForm):
         # Disable and add help_text to the merged_to field on this form
         self.fields['merged_to'].disabled = True
         self.fields['merged_to'].help_text = _('This ticket is merged into the selected ticket.')
+
+        # Don't disable dependent fields when editing an existing ticket
+        kwargs['edit'] = True
 
         for display_data in display_objects:
             initial_value = None
