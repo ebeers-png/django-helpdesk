@@ -103,6 +103,9 @@ class BaseCreateTicketView(abstract_views.AbstractCreateTicketMixin, FormView):
         return kwargs
 
     def form_valid(self, form):
+        if FormType.objects.get(pk=self.form_id).view_only:
+            return HttpResponseRedirect(reverse('helpdesk:home'))
+
         request = self.request
         if 'description' in form.cleaned_data and text_is_spam(form.cleaned_data['description'], request):
             # This submission is spam. Let's not save it.

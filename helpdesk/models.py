@@ -402,7 +402,9 @@ class FormType(models.Model):
                                     help_text=_('Should this form allow prepopulation from a building ID?'))
     pull_cycle=models.ForeignKey(Cycle, on_delete=models.SET_NULL, null=True, blank=True,
                                     help_text=_('BEAM Cycle to pull property data from. Required if prepopulate is checked or using derived column fields.'))
-
+    view_only = models.BooleanField(_('View-Only Form?'), blank=False, default=False,
+                                    help_text=_('Should this form not allow any submissions? Removes the submit button from the form.'))
+    
     # Add Preset Form Fields to the Database, avoiding having to run a PSQL command in another terminal window.
     # This will happen automatically upon FormType Creation
 

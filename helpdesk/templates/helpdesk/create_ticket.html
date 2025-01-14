@@ -76,9 +76,11 @@
                             {% endwith %}
                         {% endif %}
                     {% endfor %}
+                    {% if form.view_only == False%}
                     <button type="submit" class="btn btn-primary btn-lg btn-block">
                         <i class="fa fa-send"></i> {% trans "Submit Ticket" %}
                     </button>
+                    {% endif %}
                 </form>
             </div>
         </div>

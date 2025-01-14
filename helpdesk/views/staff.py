@@ -368,7 +368,8 @@ def create_form(request):
                 'staff': formtype.staff,
                 'unlisted': formtype.unlisted,
                 'prepopulate': formtype.prepopulate,
-                'pull_cycle': formtype.pull_cycle
+                'pull_cycle': formtype.pull_cycle,
+                'view_only': formtype.view_only
             },
             initial_customfields = CustomField.objects.filter(ticket_form=formtype),
             organization = org,
@@ -396,6 +397,7 @@ def create_form(request):
             formtype.unlisted = form.cleaned_data['unlisted']
             formtype.prepopulate = form.cleaned_data['prepopulate']
             formtype.pull_cycle = form.cleaned_data['pull_cycle']
+            formtype.view_only = form.cleaned_data['view_only']
             formtype.save()
 
             if formset.is_valid():
@@ -454,8 +456,9 @@ def edit_form(request, pk):
                 'public': formtype.public,
                 'staff': formtype.staff,
                 'unlisted': formtype.unlisted,
-                'prepopulate': formtype.prepopulate,       
-                'pull_cycle': formtype.pull_cycle
+                'prepopulate': formtype.prepopulate,
+                'pull_cycle': formtype.pull_cycle,
+                'view_only': formtype.view_only
             },
             initial_customfields=CustomField.objects.filter(ticket_form=formtype).prefetch_related('parent_fields'),
             organization=formtype.organization,
@@ -473,6 +476,7 @@ def edit_form(request, pk):
         form = EditFormTypeForm(request.POST, organization=formtype.organization, initial_customfields=initial_customfields)
         formset = form.CustomFieldFormSet(request.POST)
 
+        dependency_error = False
         try:
             with transaction.atomic():
                 if form.is_valid():
@@ -485,13 +489,13 @@ def edit_form(request, pk):
                     formtype.unlisted = form.cleaned_data['unlisted']
                     formtype.prepopulate = form.cleaned_data['prepopulate']
                     formtype.pull_cycle = form.cleaned_data['pull_cycle']
+                    formtype.view_only = form.cleaned_data['view_only']
                     formtype.save()
 
                     if formset.is_valid():
                         for df in formset.deleted_forms:
                             if df.cleaned_data['id']: df.cleaned_data['id'].delete()
 
-                        dependency_error = False
                         for cf_indx, cf in enumerate(formset.cleaned_data):
                             if not cf or cf['DELETE']:
                                 # continue to next item if form is empty or item is being deleted
@@ -555,6 +559,9 @@ def edit_form(request, pk):
                 'public': formtype.public,
                 'staff': formtype.staff,
                 'unlisted': formtype.unlisted,
+                'prepopulate': formtype.prepopulate,
+                'pull_cycle': formtype.pull_cycle,
+                'view_only': formtype.view_only
             },
             initial_customfields=CustomField.objects.filter(ticket_form=formtype).prefetch_related('parent_fields'),
             organization=formtype.organization,
@@ -591,6 +598,9 @@ def duplicate_form(request, pk):
         public = formtype.public,
         staff = formtype.staff,
         unlisted = formtype.unlisted,
+        prepopulate = formtype.prepopulate,
+        pull_cycle = formtype.pull_cycle,
+        view_only = formtype.view_only,
         created = datetime.now(),
         updated = datetime.now(),
     )
@@ -2222,6 +2232,9 @@ class CreateTicketView(MustBeStaffMixin, abstract_views.AbstractCreateTicketMixi
         return kwargs
 
     def form_valid(self, form):
+        if FormType.objects.get(pk=self.form_id).view_only:
+            return HttpResponseRedirect(reverse('helpdesk:dashboard'))
+
         self.ticket = form.save(form_id=self.form_id, user=self.request.user if self.request.user.is_authenticated else None)
         if self.request.GET.get('milestone_beam_redirect', False):
             # Pair Ticket to Milestone
