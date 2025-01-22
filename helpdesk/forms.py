@@ -32,6 +32,7 @@ from helpdesk.decorators import list_of_helpdesk_staff
 import re
 
 from seed.models import Column
+from seed.utils.storage import get_media_url
 
 logger = logging.getLogger(__name__)
 User = get_user_model()
@@ -334,9 +335,11 @@ class EditKBCategoryForm(forms.ModelForm):
 class AttachmentFileInputWidget(forms.ClearableFileInput):
     template_name = 'helpdesk/include/attachment_input.html'
 
+
 class ClearableFileInput(forms.ClearableFileInput):
     allow_multiple_selected = True # Must specify as of Django 3.2.19
     template_name = 'helpdesk/include/clearable_file_input.html'
+
 
 class EditKBItemForm(forms.ModelForm):
 
@@ -387,6 +390,8 @@ class EditKBItemForm(forms.ModelForm):
         self.attachment_formset.initial = initial_attach
 
         for form in self.attachment_formset.forms:
+            form.fields['file'].widget.attrs.update({
+                'url': get_media_url(form.initial['file'].name)})
             form.fields['file'].required = False
 
 

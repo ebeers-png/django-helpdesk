@@ -50,6 +50,7 @@ from seed.models import (
     Property,
     TaxLot,
 )
+from seed.utils.storage import get_media_url
 
 
 logger = logging.getLogger(__name__)
@@ -1188,6 +1189,9 @@ class Attachment(models.Model):
 
     def get_size(self):
         return self.file.file.size
+
+    def download_attachment(self):
+        return get_media_url(self.file)
 
     def attachment_path(self, filename):
         """Provide a file path that will help prevent files being overwritten, by
