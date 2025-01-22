@@ -10,9 +10,9 @@ from django.contrib.auth.models import Permission
 from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ObjectDoesNotExist, ValidationError
-from django.db.models.signals import post_save
+from django.db.models.signals import pre_save, post_save
 from django.dispatch import receiver
-from django.db import models
+from django.db import IntegrityError, models
 from django.conf import settings
 from django.utils import timezone
 from django.utils.translation import ugettext_lazy as _, ugettext
@@ -384,7 +384,7 @@ class FormType(models.Model):
     name = models.CharField(max_length=255, null=True)
     description = models.TextField(blank=True, null=True,
                                    help_text=_("Introduction text included in the form.<br/><br/>" + markdown_allowed()),)
-    
+
     queue = models.ForeignKey(Queue, on_delete=models.SET_NULL, null=True, blank=True,
                               help_text=_('If a queue is selected, tickets will automatically be added to this queue when submitted. '
                                           'This option will hide the Queue field on the form.'))
@@ -1078,7 +1078,7 @@ class TimeSpent(models.Model):
             return self.stop_time - self.start_time
         else:
             return None
-    
+
     @property
     def time_spent_formatted(self):
         return format_time_spent(self.get_time_spent)
@@ -1549,7 +1549,7 @@ class KBItem(models.Model):
                     '&amp;nbsp;<br/>Body of subsection.<br/>&amp;nbsp;<br/>I can add many lines of text to this. '
                     "It will all be included in the section.<br/>~!~<br/><br/>"
                     "&amp;nbsp;<br/>This, however, won't be included in the collapsing section.</pre>"
-                    "<b>Anchor links:</b></br>Add <code>{: #name }</code> on the same line after a header, or on the line " 
+                    "<b>Anchor links:</b></br>Add <code>{: #name }</code> on the same line after a header, or on the line "
                     "after a paragraph to create an anchor. Use <code>[Link Text](#name)</code> to create a link "
                     "that will jump to the anchor. "
                     "Name can have letters, numbers, and underscores - no spaces. "
@@ -1675,7 +1675,7 @@ class KBItem(models.Model):
             def __call__(self, match):
                     self.count += 1
                     return self.pattern.format(self.count)
-            
+
         anchor_target_pattern = r'{\:\s*#(\w+)\s*}'
         anchor_link_pattern = r'\[(.+)\]\(#(\w+)\)'
         new_answer, anchor_target_count = re.subn(anchor_target_pattern, "{: #anchor-\g<1> }", self.answer)
@@ -2203,6 +2203,43 @@ class CustomField(models.Model):
     def get_markdown(self):
         return get_markdown(self.help_text, self.ticket_form.organization)
 
+
+class DependsOn(models.Model):
+    parent = models.ForeignKey(CustomField, blank=True, null=True, on_delete=models.CASCADE, related_name='dependent_fields')
+    dependent = models.ForeignKey(CustomField, blank=True, null=True, on_delete=models.CASCADE, related_name='parent_fields')
+    value = models.TextField(
+        _('Expected Value'),
+        help_text=_('Show field when the parent has this value. Use Yes or No when the parent field is a boolean (a checkbox). Not compatible with Attachment or Key Value parent fields.'),
+        blank=True,
+        null=True,
+    )
+    parent_help_text = models.TextField(
+        _('Parent Help Text'),
+        help_text=_('This text will display under the parent field when the dependent field is visible.'),
+        blank=True,
+        null=True
+    )
+
+
+@receiver(pre_save, sender=DependsOn)
+def detect_circular_dependencies(instance: DependsOn, **kwargs):
+    circular = False
+    for parent in instance.parent.parent_fields.all():
+        circular = circular or circular_dependency(parent, instance.dependent)
+        if circular:
+            raise IntegrityError('Circular dependency detected in form')
+        
+def circular_dependency(current: DependsOn, target: CustomField):
+    if current.parent == target:
+        return True
+    
+    circular = False
+    for parent in current.parent.parent_fields.all():
+        circular = circular or circular_dependency(parent, target)
+        if circular:
+            return circular
+    return circular
+    
 
 class TicketCustomFieldValue(models.Model):
     ticket = models.ForeignKey(

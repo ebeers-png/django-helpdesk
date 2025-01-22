@@ -1,5 +1,5 @@
 {% load i18n bootstrap4form %}
-{% load load_helpdesk_settings %}
+{% load load_helpdesk_settings helpdesk_util %}
 
 {% with request|load_helpdesk_settings as helpdesk_settings %}
     {% if helpdesk_settings.HELPDESK_SUBMIT_A_TICKET_PUBLIC %}
@@ -18,11 +18,14 @@
 
         <form method='post' enctype='multipart/form-data' id='ticket_submission_form'>
             {% csrf_token %}
+            {{ form.parent_to_dependents|json_script:"parent_to_dependents" }}
+            {{ form.dependent_to_parents|json_script:"dependent_to_parents" }}
             {% for field in form %}
                 {% if field.is_hidden %}
                     {{ field }}
                 {% else %}
-                    <div class="form-group" id='id_group_{{ field.name }}'>
+                    {% with parents=form.dependent_to_parents|get:field.name dependents=form.parent_to_dependents|get:field.name %}
+                    <div class="form-group" id='id_group_{{ field.name }}' {% if parents %}hidden{% endif%}>
                         <label for='id_{{ field.name }}'>
                             {{ field.label }}{% if field.field.required %}<span style="color:red;">*</span>{% endif %}
                         </label>
@@ -37,7 +40,18 @@
                                 {% endblocktrans %}
                             </small>
                         {% endif %}
+                        {% if dependents %}
+                            {% for dependent in dependents %}
+                                {% if dependent.alert_text %}
+                                    <small class='form_help_text' hidden data-dependent='{{dependent.field_name}}'>
+                                        {{ dependent.alert_text|safe }}
+                                    </small>
+                                    {% if forloop.last is not True %}<br>{% endif %}
+                                {% endif %}
+                            {% endfor %}
+                        {% endif %}
                     </div>
+                    {% endwith %}
                 {% endif %}
             {% endfor %}
             <button type="submit" class="btn btn-primary btn-lg btn-block">
@@ -48,3 +62,67 @@
         <p>{% trans "Public ticket submission is disabled. Please contact the administrator for assistance." %}</p>
     {% endif %}
 {% endwith %}
+
+{% block helpdesk_js %}
+    {{ form.media.js }}
+    <script>
+        const PARENT_TO_DEPENDENTS = JSON.parse(document.getElementById('parent_to_dependents').textContent)
+        const DEPENDENT_TO_PARENTS = JSON.parse(document.getElementById('dependent_to_parents').textContent)
+
+        /**
+        * Update alert texts on a parent element based on its current value
+        */
+        function updateParentField(parent_name) {
+            let parent_input = $(`#id_${parent_name}`)
+            for (const dependent of PARENT_TO_DEPENDENTS[parent_name]) {
+                updateDependentField(dependent.field_name)
+
+                let alert_texts = $(`small[data-dependent=${dependent.field_name}]`)
+                let dependent_element = $(`#id_group_${dependent.field_name}`)
+
+                if (!dependent_element.attr('hidden')) {
+                    alert_texts.removeAttr('hidden')
+                } else {
+                    alert_texts.attr('hidden', 'True')
+                }
+            }
+        }
+
+        /** 
+        * Update the visibility of a dependent element based on its parents' values.
+        * Cascades down to nested dependencies.
+        */
+        function updateDependentField(dependent_name) {
+            let dependent_input = $(`#id_${dependent_name}`)
+            let dependent_element = $(`#id_group_${dependent_name}`)
+            let show = true
+            for (const parent of DEPENDENT_TO_PARENTS[dependent_name]) {
+                let parent_input = $(`#id_${parent.field_name}`)
+                let parent_element = $(`#id_group_${parent.field_name}`)
+                
+                let value = parent_input.val()
+                if (parent_input.prop('checked') != undefined) {
+                    value = parent_input.prop('checked') ? 'Yes' : 'No'
+                }
+                show &&= value == parent.value && !parent_element.attr('hidden')
+
+            }
+            dependent_element.attr('hidden', show ? null : 'True')
+            dependent_input.attr('disabled', show ? null : 'True')
+
+            // Cascade down to its dependents
+            if (PARENT_TO_DEPENDENTS[dependent_name]) {
+                for (const dependent of PARENT_TO_DEPENDENTS[dependent_name]) {
+                    updateDependentField(dependent.field_name)
+                }
+            }
+        }
+
+        for (const [parent, dependents] of Object.entries(PARENT_TO_DEPENDENTS)) {
+            $(`#id_${parent}`).on('change', function () {
+                updateParentField(parent)
+            })
+            updateParentField(parent)
+        }
+    </script>
+{% endblock %}
