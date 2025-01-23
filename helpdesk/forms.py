@@ -746,6 +746,7 @@ class AbstractTicketForm(CustomFieldMixin, forms.Form):
     hidden_fields = []
     parent_to_dependents = {}
     dependent_to_parents = {}
+    view_only = False
 
     description = forms.CharField(
         widget=forms.Textarea(attrs={'class': 'form-control'})
@@ -780,6 +781,7 @@ class AbstractTicketForm(CustomFieldMixin, forms.Form):
         self.form_title = form.name
         self.form_introduction = form.get_markdown()
         self.form_queue = form.queue
+        self.view_only = form.view_only
         if form.queue:
             del self.fields['queue']
 
