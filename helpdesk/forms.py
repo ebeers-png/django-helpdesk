@@ -161,6 +161,9 @@ class CustomFieldMixin(object):
         if field.parent_fields.all() or field.read_only:
             instanceargs['widget'].attrs['disabled'] = True
 
+        if field.read_only:
+            instanceargs['widget'].attrs['data-read-only'] = True
+
         # TODO change this
         if is_extra_data(field.field_name):
             self.fields['e_%s' % field.field_name] = fieldclass(**instanceargs)
