@@ -76,7 +76,9 @@ from datetime import timedelta, datetime
 
 from ..templated_email import send_templated_mail
 
-from seed.models import PropertyView, Property, TaxLotView, TaxLot, Column
+from seed.models import Cycle, PropertyView, Property, TaxLotView, TaxLot, Column, DataQualityCheck, DataQualityResults, PropertyState, TaxLotState
+from seed.models.data_quality_results import DataQualityStatus
+from seed.serializers.data_quality import DataQualityStatusSerializer
 from post_office.models import STATUS, Email
 from urllib.parse import urlparse, urlunparse
 from django.http import QueryDict
@@ -1033,6 +1035,8 @@ def view_ticket(request, ticket_id):
     for t in taxlots:
         if t['address'] is None or t['address'] == '':
             t['address'] = '(No address found)'
+    dq_statuses = DataQualityStatus.objects.filter(organization=org)
+    cycles = Cycle.objects.filter(organization=org, end__isnull=False).order_by('end')
 
     return render(request, 'helpdesk/ticket.html', {
         'ticket': ticket,
@@ -1046,6 +1050,8 @@ def view_ticket(request, ticket_id):
         'ticketcc_string': ticketcc_string,
         'SHOW_SUBSCRIBE': show_subscribe,
         'extra_data': extra_data,
+        'cycles': cycles,
+        'dq_statuses': dq_statuses,
         'properties': properties,
         'taxlots': taxlots,
         'is_staff': is_helpdesk_staff(request.user),
@@ -3271,7 +3277,6 @@ def _pair_properties_by_form(request, form, tickets):
 
     org = form.organization.id
     fields = form.customfield_set.exclude(column__isnull=True).exclude(lookup=False).select_related("column")
-
     def lookup(query, state, view, cycle, building):
         """ Queries database for either properties or taxlots. """
         if query and cycle:
@@ -3323,6 +3328,134 @@ def _pair_properties_by_form(request, form, tickets):
                     (not (lookups['TaxLotState'] and not taxlot_lookup)):
                 break
 
+
+@staff_member_required
+def update_ticket_inventory_status(request, ticket_id):
+    ticket = get_object_or_404(Ticket, id=ticket_id)
+
+    cycle_id = request.POST.get('cycle_id')
+    status_id = request.POST.get('status_id')
+    exempt = request.POST.get('exempt')
+    sticky = request.POST.get('sticky')
+
+    status_id = status_id if status_id != '' else None
+    exempt = exempt.lower() == 'true' if exempt else None
+    sticky = sticky.lower() == 'true' if sticky else None
+    
+    state_ids = []
+    staff_user = request.user.id
+    org_id = ticket.ticket_form.organization.id
+    for property in ticket.beam_property.all():
+        property_view = property.views.filter(cycle_id=cycle_id).first()
+        state_ids.append(property_view.state.id)
+    
+    inventory_type = 'properties'
+
+    if status_id is not None and status_id != 0:
+        status = DataQualityStatus.objects.get(id=status_id)
+    
+    dq = DataQualityCheck.objects.get(organization_id=org_id)
+
+    if inventory_type == 'properties':
+        results_list = {x for x in DataQualityResults.objects
+            .filter(property_state__in=state_ids, data_quality_id=dq.id)
+            .order_by('property_state', '-created').distinct('property_state')
+            .values_list('pk', flat=True)}
+    else:
+        results_list = {x for x in DataQualityResults.objects
+            .filter(taxlot_state__in=state_ids, data_quality_id=dq.id)
+            .order_by('taxlot_state', '-created').distinct('taxlot_state')
+            .values_list('pk', flat=True)}
+
+    changes_list = []
+    for id in results_list:
+        result = DataQualityResults.objects.get(pk=id)
+        changes = []
+        if inventory_type == 'properties':
+            state_ids.remove(result.property_state.id)
+        else:
+            state_ids.remove(result.taxlot_state.id)
+        if status_id is not None:
+            changes.append({
+                'old': 'no status' if not result.status else result.status.name,
+                'new': 'no status' if status_id == 0 else status.name,
+                'type': 'Result of'
+            })
+            if status_id == 0:
+                result.status = None
+            else:
+                result.status_id = status.id
+        if exempt is not None:
+            changes.append({
+                'old': 'exempt' if result.exempt is True else 'not exempt',
+                'new': 'exempt' if exempt is True else 'not exempt',
+                'type': 'Exemption status for'
+            })
+            result.exempt = exempt
+        if sticky is not None:
+            if result.sticky != sticky:
+                changes.append({
+                    'old': 'sticky' if result.sticky is True else 'not sticky',
+                    'new': 'sticky' if sticky is True else 'not sticky',
+                    'type': 'Stickiness of result from'
+                })
+            result.sticky = sticky
+        result.save()
+
+        if inventory_type == 'properties':
+            changes_list.append((result.property_state.propertyview_set.first(), changes))
+        else:
+            changes_list.append((result.taxlot_state.taxlotview_set.first(), changes))
+
+    if len(state_ids):
+        for state_id in state_ids:
+            changes = []
+            if inventory_type == 'properties':
+                property = PropertyState.objects.get(id=state_id)
+                result = DataQualityResults.objects.create(
+                    property_state_id=property.id,
+                    data_quality=dq,
+                    results=[],
+                )
+            else:
+                taxlot = TaxLotState.objects.get(id=state_id)
+                result = DataQualityResults.objects.create(
+                    taxlot_state_id=taxlot.id,
+                    data_quality=dq,
+                    results=[],
+                )
+            if status_id is not None:
+                changes.append({
+                    'old': 'no status' if not result.status else result.status.name,
+                    'new': 'no status' if status_id == 0 else status.name,
+                    'type': 'Result of'
+                })
+                if status_id == 0:
+                    result.status = None
+                else:
+                    result.status_id = status.id
+            if exempt is not None:
+                changes.append({
+                    'old': 'exempt' if result.exempt is True else 'not exempt',
+                    'new': 'exempt' if exempt is True else 'not exempt',
+                    'type': 'Exemption status for'
+                })
+                result.exempt = exempt
+            if sticky is not None:
+                if result.sticky != sticky:
+                    changes.append({
+                        'old': 'sticky' if result.sticky is True else 'not sticky',
+                        'new': 'sticky' if sticky is True else 'not sticky',
+                        'type': 'Stickiness of result from'
+                    })
+                result.sticky = sticky
+            result.save()
+            if inventory_type == 'properties':
+                changes_list.append((result.property_state.propertyview_set.first(), changes))
+            else:
+                changes_list.append((result.taxlot_state.taxlotview_set.first(), changes))
+    DataQualityResults.results_changed(changes_list, dq, staff_user)
+    return HttpResponseRedirect(reverse('helpdesk:view', args=[ticket.id]))
 
 @staff_member_required
 def pair_property_milestone(request, ticket_id):

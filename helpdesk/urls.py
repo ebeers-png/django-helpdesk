@@ -226,6 +226,10 @@ urlpatterns = [
         staff.pair_property_ticket,
         name="pair_property_ticket"),
 
+    url(r'update_ticket_inventory_status/(?P<ticket_id>[0-9]+)/$',
+        staff.update_ticket_inventory_status,
+        name="update_ticket_inventory_status"),  
+
     url(r'copy_to_beam/(?P<ticket_id>[0-9]+)/$',
         staff.load_copy_to_beam,
         name="copy_to_beam"),
