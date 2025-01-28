@@ -194,11 +194,11 @@ class EditTicketForm(CustomFieldMixin, forms.ModelForm):
         Add any custom fields that are defined to the form
         """
         super(EditTicketForm, self).__init__(*args, **kwargs)
-        form_id = self.instance.ticket_form.pk
+        self.form_id = self.instance.ticket_form.pk
         extra_data = self.instance.extra_data
 
         # CustomField already excludes builtin_fields and SEED fields
-        display_objects = CustomField.objects.filter(ticket_form=form_id).exclude(field_name='queue')
+        display_objects = CustomField.objects.filter(ticket_form=self.form_id).exclude(field_name='queue')
 
         # Manually add in queue, not doing so would show all queues
         queues = Queue.objects.filter(organization=self.instance.ticket_form.organization)
