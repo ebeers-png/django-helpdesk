@@ -2326,6 +2326,9 @@ def report_index(request):
     number_tickets = Tickets.count()
     saved_query = request.GET.get('saved-query', None)
 
+    org = request.user.default_organization.helpdesk_organization
+    user_saved_queries = SavedSearch.objects.filter(user=request.user, organization=org) 
+
     basic_ticket_stats = calc_basic_ticket_stats(Tickets)
 
     # The following query builds a grid of queues & ticket statuses,
@@ -2351,6 +2354,7 @@ def report_index(request):
     return render(request, 'helpdesk/report_index.html', {
         'number_tickets': number_tickets,
         'saved_query': saved_query,
+        'user_saved_queries': user_saved_queries,
         'basic_ticket_stats': basic_ticket_stats,
         'dash_tickets': dash_tickets,
         'debug': settings.DEBUG,
@@ -3722,9 +3726,38 @@ def export_report(request):
     """
     action = request.POST.get('action')
     paginate = action == 'export_year'  # TODO
+    huser = HelpdeskUser(request.user)
+    qs = Ticket.objects.all()
+
+    if action.startswith('export_filtered_'):
+        try:
+            saved_query_id = int(action.split('_')[-1])
+
+            # Todo: streamline code, this is duplicate from load_saved_query function
+            saved_query = SavedSearch.objects.get(
+                Q(pk=saved_query_id) & 
+                ((Q(shared=True) & ~Q(opted_out_users__in=[request.user])) | Q(user=request.user))
+            )
+
+            # Decode query parameters
+            if saved_query.query.startswith('b\''):
+                b64query = saved_query.query[2:-1]
+            else:
+                b64query = saved_query.query
+
+            query_params = query_from_base64(b64query)
+
+            qs = Query(huser, query_params=query_params).refresh_query()
+        except (SavedSearch.DoesNotExist, QueryLoadError, ValueError):
+            # Handle invalid saved query or query parameters
+            return HttpResponseRedirect(reverse('helpdesk:list'))
+    elif action == 'export_all':
+        pass
+    else:
+        pass
 
     user_queue_ids = HelpdeskUser(request.user).get_queues().values_list('id', flat=True)
-    qs = Ticket.objects.filter(queue_id__in=user_queue_ids
+    qs = qs.filter(queue_id__in=user_queue_ids
                                ).order_by('created', 'ticket_form'
                                           ).select_related('ticket_form__organization', 'assigned_to', 'queue',
                                                            ).prefetch_related('followup_set__user', 'beam_property')

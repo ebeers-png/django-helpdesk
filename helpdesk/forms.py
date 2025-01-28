@@ -32,6 +32,7 @@ from helpdesk.decorators import list_of_helpdesk_staff
 import re
 
 from seed.models import Column, Cycle
+from seed.utils.storage import get_media_url
 
 logger = logging.getLogger(__name__)
 User = get_user_model()
@@ -161,7 +162,7 @@ class CustomFieldMixin(object):
                 raise NameError("Unrecognized data_type %s" % field.data_type)
 
         # Disable dependent fields by default
-        if field.parent_fields.all() or field.read_only:
+        if (field.parent_fields.all() and not kwargs.get('edit', False)) or field.read_only :
             instanceargs['widget'].attrs['disabled'] = True
 
         if field.read_only:
@@ -206,6 +207,9 @@ class EditTicketForm(CustomFieldMixin, forms.ModelForm):
         # Disable and add help_text to the merged_to field on this form
         self.fields['merged_to'].disabled = True
         self.fields['merged_to'].help_text = _('This ticket is merged into the selected ticket.')
+
+        # Don't disable dependent fields when editing an existing ticket
+        kwargs['edit'] = True
 
         for display_data in display_objects:
             initial_value = None
@@ -340,15 +344,18 @@ class EditKBCategoryForm(forms.ModelForm):
 class AttachmentFileInputWidget(forms.ClearableFileInput):
     template_name = 'helpdesk/include/attachment_input.html'
 
+
 class ClearableFileInput(forms.ClearableFileInput):
     allow_multiple_selected = True # Must specify as of Django 3.2.19
     template_name = 'helpdesk/include/clearable_file_input.html'
-    
+
 class PrepopulateFormInput(forms.TextInput):
     template_name = 'helpdesk/include/prepopulate_form_input.html'
 
+
 class DerivedColumnInput(forms.TextInput):
     template_name = 'helpdesk/include/derived_column_widget.html'
+
 
 class EditKBItemForm(forms.ModelForm):
 
@@ -399,6 +406,8 @@ class EditKBItemForm(forms.ModelForm):
         self.attachment_formset.initial = initial_attach
 
         for form in self.attachment_formset.forms:
+            form.fields['file'].widget.attrs.update({
+                'url': get_media_url(form.initial['file'].name)})
             form.fields['file'].required = False
 
 
