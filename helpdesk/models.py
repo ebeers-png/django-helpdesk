@@ -421,8 +421,12 @@ class FormType(models.Model):
         
         constraints = [
             models.CheckConstraint(
-                name='multi_pair_xor_prepopulate',
-                check=(Q(multi_pair=True, prepopulate=False) | Q(multi_pair=False, prepopulate=True))
+                name='multi_pair_or_prepopulate',
+                check=(
+                    Q(multi_pair=True, prepopulate=False) 
+                    | Q(multi_pair=False, prepopulate=True)
+                    | Q(multi_pair=False, prepopulate=False)
+                )
             )
         ]
 

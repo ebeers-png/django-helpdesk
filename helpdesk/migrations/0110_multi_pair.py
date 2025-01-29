@@ -17,6 +17,6 @@ class Migration(migrations.Migration):
         ),
         migrations.AddConstraint(
             model_name='formtype',
-            constraint=models.CheckConstraint(check=models.Q(models.Q(('multi_pair', True), ('prepopulate', False)), models.Q(('multi_pair', False), ('prepopulate', True)), _connector='OR'), name='multi_pair_xor_prepopulate'),
+            constraint=models.CheckConstraint(check=models.Q(models.Q(('multi_pair', True), ('prepopulate', False)), models.Q(('multi_pair', False), ('prepopulate', True)), models.Q(('multi_pair', False), ('prepopulate', False)), _connector='OR'), name='multi_pair_or_prepopulate'),
         ),
     ]
