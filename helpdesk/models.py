@@ -399,6 +399,8 @@ class FormType(models.Model):
     unlisted = models.BooleanField(_('Unlisted'), blank=False, default=False,
                                    help_text=_('Should this form be hidden from the public form list? '
                                                '(If the "public" option is checked, this form will still be accessible by everyone through the link.)'))
+    multi_pair = models.BooleanField(_('Multi-Property Pairing'), blank=False, default=False,
+                                     help_text=_('Should this form allow inputting and pairing multiple building IDs?'))
     prepopulate=models.BooleanField(_('Prepopulate Form?'), blank=False, default=False,
                                     help_text=_('Should this form allow prepopulation from a building ID?'))
     pull_cycle=models.ForeignKey(Cycle, on_delete=models.SET_NULL, null=True, blank=True,
