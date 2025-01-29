@@ -13,6 +13,7 @@ from django.core.exceptions import ObjectDoesNotExist, ValidationError
 from django.db.models.signals import pre_save, post_save
 from django.dispatch import receiver
 from django.db import IntegrityError, models
+from django.db.models import Q
 from django.conf import settings
 from django.utils import timezone
 from django.utils.translation import ugettext_lazy as _, ugettext
@@ -417,6 +418,13 @@ class FormType(models.Model):
         # TODO index by organization and id?
         get_latest_by = "created"
         ordering = ('id',)
+        
+        constraints = [
+            models.CheckConstraint(
+                name='multi_pair_xor_prepopulate',
+                check=(Q(multi_pair=True, prepopulate=False) | Q(multi_pair=False, prepopulate=True))
+            )
+        ]
 
     def __str__(self):
         return 'FormType - %s %s' % (self.id, self.name)

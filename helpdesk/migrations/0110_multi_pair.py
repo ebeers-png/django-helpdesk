@@ -6,7 +6,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('helpdesk', '0108_derived_column_field'),
+        ('helpdesk', '0109_derived_column_field'),
     ]
 
     operations = [
@@ -14,5 +14,9 @@ class Migration(migrations.Migration):
             model_name='formtype',
             name='multi_pair',
             field=models.BooleanField(default=False, help_text='Should this form allow inputting and pairing multiple building IDs?', verbose_name='Multi-Property Pairing'),
+        ),
+        migrations.AddConstraint(
+            model_name='formtype',
+            constraint=models.CheckConstraint(check=models.Q(models.Q(('multi_pair', True), ('prepopulate', False)), models.Q(('multi_pair', False), ('prepopulate', True)), _connector='OR'), name='multi_pair_xor_prepopulate'),
         ),
     ]
