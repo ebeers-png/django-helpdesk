@@ -7,7 +7,7 @@ import django.db.models.deletion
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('helpdesk', '0106_dependson'),
+        ('helpdesk', '0107_alter_dependson_value'),
     ]
 
     operations = [
