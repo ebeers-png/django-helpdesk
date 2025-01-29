@@ -576,7 +576,7 @@ class Ticket(models.Model):
     building_name = models.CharField(max_length=200, blank=True, null=True)
     building_address = models.TextField(blank=True, null=True)
     pm_id = models.CharField(_("Portfolio Manager ID"), max_length=200, blank=True, null=True)
-    building_id = models.CharField(_("Building ID"), max_length=200, blank=True, null=True)
+    building_id = models.JSONField(_("Building ID"), blank=True, null=True)
 
     allow_sending = models.BooleanField(default=True)
 
