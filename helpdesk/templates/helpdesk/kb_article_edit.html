@@ -33,6 +33,11 @@
                     <fieldset>
                         {{ form|bootstrap4form }}
                         <input type="hidden" name="manage" value="{{ manage }}">
+                        {% if action == "Edit" %}
+                            {% include 'helpdesk/include/collapsible_formset.html' with formset=form.attachment_formset form_empty=form.form_empty formset_title="Attachment" formset_type="kbi_attachment" required_fields="['file']"%}
+                        {% else %}
+                            <p>Attachments</br><small>{% trans "Files can only be attached to an article after it has been created. After creating this article, edit it to upload attachments." %}</small></p>
+                        {% endif %}
                         <div class='buttons form-group'>
                             <input type='submit' class="btn btn-primary btn" 
                                 value="{% if action == 'Create' %}Create Article{% else %}Save Changes{% endif %}"/>
