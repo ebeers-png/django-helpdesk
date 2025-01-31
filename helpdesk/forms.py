@@ -31,7 +31,7 @@ from helpdesk.email import create_ticket_cc
 from helpdesk.decorators import list_of_helpdesk_staff
 import re
 
-from seed.models import Column
+from seed.models import Column, Cycle
 from seed.utils.storage import get_media_url
 
 logger = logging.getLogger(__name__)
@@ -84,6 +84,16 @@ class CustomFieldMixin(object):
         # if-elif branches start with special cases
         if field.data_type is None:
             fieldclass = forms.NullBooleanField
+        elif field.field_name == 'building_id' and (kwargs.get('prepopulate', False) or kwargs.get('multi_pair', False)):
+            if kwargs.get('prepopulate', False):
+                fieldclass = forms.CharField
+                instanceargs['widget'] = PrepopulateFormInput(attrs={'class': 'form-control'})
+            elif kwargs.get('multi_pair', False):
+                fieldclass = MatchOnField
+                instanceargs['num_widgets'] = 1
+                instanceargs['field_type'] = forms.CharField()
+                instanceargs['widget_type'] = forms.TextInput(attrs={'class': 'form-control'})
+                del instanceargs['widget']
         elif field.data_type == 'varchar':
             fieldclass = forms.CharField
             instanceargs['max_length'] = field.max_length
@@ -135,6 +145,9 @@ class CustomFieldMixin(object):
 
             instanceargs['key_field'] = forms.ChoiceField(choices=choices, widget=key_widget)
             instanceargs['value_field'] = forms.CharField(widget=value_widget)
+        elif field.data_type == 'derived_column':
+            fieldclass = forms.CharField
+            instanceargs['widget'] = DerivedColumnInput(attrs={'class': 'form-control', 'data-form-id': self.form_id})
         else:
             # Try to use the immediate equivalences dictionary
             try:
@@ -156,8 +169,11 @@ class CustomFieldMixin(object):
                 raise NameError("Unrecognized data_type %s" % field.data_type)
 
         # Disable dependent fields by default
-        if field.parent_fields.all() and not kwargs.get('edit', False):
+        if (field.parent_fields.all() and not kwargs.get('edit', False)) or field.read_only :
             instanceargs['widget'].attrs['disabled'] = True
+
+        if field.read_only:
+            instanceargs['widget'].attrs['data-read-only'] = True
 
         # TODO change this
         if is_extra_data(field.field_name):
@@ -185,11 +201,11 @@ class EditTicketForm(CustomFieldMixin, forms.ModelForm):
         Add any custom fields that are defined to the form
         """
         super(EditTicketForm, self).__init__(*args, **kwargs)
-        form_id = self.instance.ticket_form.pk
+        self.form_id = self.instance.ticket_form.pk
         extra_data = self.instance.extra_data
 
         # CustomField already excludes builtin_fields and SEED fields
-        display_objects = CustomField.objects.filter(ticket_form=form_id).exclude(field_name='queue')
+        display_objects = CustomField.objects.filter(ticket_form=self.form_id).exclude(field_name='queue')
 
         # Manually add in queue, not doing so would show all queues
         queues = Queue.objects.filter(organization=self.instance.ticket_form.organization)
@@ -339,6 +355,13 @@ class AttachmentFileInputWidget(forms.ClearableFileInput):
 class ClearableFileInput(forms.ClearableFileInput):
     allow_multiple_selected = True # Must specify as of Django 3.2.19
     template_name = 'helpdesk/include/clearable_file_input.html'
+
+class PrepopulateFormInput(forms.TextInput):
+    template_name = 'helpdesk/include/prepopulate_form_input.html'
+
+
+class DerivedColumnInput(forms.TextInput):
+    template_name = 'helpdesk/include/derived_column_widget.html'
 
 
 class EditKBItemForm(forms.ModelForm):
@@ -556,7 +579,7 @@ class EditFormTypeForm(forms.ModelForm):
 
             def label_from_instance(self, column):
                 display = column.display_name if column.display_name else column.column_name
-                return "%s (%s)" % (display, column.table_name)
+                return "%s (%s)" % (display, column.table_name) + (' - Derived' if column.derived_column else '')
 
         def clean(self):
             # ticket_form is an excluded field, so must validate unique_together manually
@@ -645,6 +668,10 @@ class EditFormTypeForm(forms.ModelForm):
             .exclude(table_name='') \
             .exclude(table_name=None) \
             .order_by('column_name')
+        
+        self.fields['pull_cycle'].queryset = Cycle.objects.filter(organization_id=self.org) \
+                                                        .exclude(supercycle__isnull=False) \
+                                                        .order_by('end')
 
         self.copy_queryset = FormType.objects.filter(organization = self.org).exclude(pk=self.pk)
 
@@ -672,6 +699,7 @@ class EditFormTypeForm(forms.ModelForm):
                     'public': cf.public,
                     'column': cf.column,
                     'lookup': cf.lookup,
+                    'read_only': cf.read_only
                 })
                 if cf.parent_fields.count():
                     initial_depends_on[cf.id] = [{
@@ -692,14 +720,14 @@ class EditFormTypeForm(forms.ModelForm):
             defaults = ['queue','submitter_email', 'contact_name', 'contact_email', 'title','description','building_name','building_address','building_id','pm_id','attachment','due_date','priority','cc_emails', 'empty']
 
             self.form_empty = self.customfield_formset.empty_form
-            self.form_empty.fields['column'] = EditFormTypeForm.BaseCustomFieldFormSet.ColumnModelChoiceField(queryset=column_queryset)
+            self.form_empty.fields['column'] = EditFormTypeForm.BaseCustomFieldFormSet.ColumnModelChoiceField(queryset=column_queryset, help_text=_('Select a derived column if the data type is derived column.'))
             self.form_empty.fields['agg_list_values'] = forms.JSONField(widget=forms.HiddenInput(), required=False)
             self.form_empty.fields['list_values'] = MatchOnField(num_widgets=1, field_type=forms.CharField(), widget_type=forms.TextInput(), required=False)
             self.form_empty.depends_on = self.DependsOnFormSet()
             self.form_empty.form_empty = self.form_empty.depends_on.empty_form
 
             for form_indx, form in enumerate(self.customfield_formset.forms):
-                form.fields['column'] = EditFormTypeForm.BaseCustomFieldFormSet.ColumnModelChoiceField(queryset=column_queryset)
+                form.fields['column'] = EditFormTypeForm.BaseCustomFieldFormSet.ColumnModelChoiceField(queryset=column_queryset, help_text=_('Select a derived column if the data type is derived column.'))
                 form.fields['agg_list_values'] = forms.JSONField(widget=forms.HiddenInput(), required=False)
                 form.fields['list_values'] = MatchOnField(num_widgets=list_val_lens[form_indx] + 1, field_type=forms.CharField(), widget_type=forms.TextInput(), required=False)
 
@@ -734,6 +762,7 @@ class AbstractTicketForm(CustomFieldMixin, forms.Form):
     hidden_fields = []
     parent_to_dependents = {}
     dependent_to_parents = {}
+    view_only = False
 
     description = forms.CharField(
         widget=forms.Textarea(attrs={'class': 'form-control'})
@@ -768,6 +797,7 @@ class AbstractTicketForm(CustomFieldMixin, forms.Form):
         self.form_title = form.name
         self.form_introduction = form.get_markdown()
         self.form_queue = form.queue
+        self.view_only = form.view_only
         if form.queue:
             del self.fields['queue']
 
@@ -780,6 +810,10 @@ class AbstractTicketForm(CustomFieldMixin, forms.Form):
                 label=_('Knowledge Base Item'),
                 choices=[(kbi.pk, kbi.title) for kbi in KBItem.objects.filter(category=kbcategory.pk, enabled=True)],
             )
+        
+        # Handle multiple building ids
+        if form.multi_pair:
+            self.fields['agg_building_id'] = forms.JSONField(widget=forms.HiddenInput(), required=False)
 
         # Two-way map parents and dependents for use in the front-end
         self.parent_to_dependents = defaultdict(list)
@@ -864,6 +898,10 @@ class AbstractTicketForm(CustomFieldMixin, forms.Form):
                 elif isinstance(value, Decimal):
                     value = str(value)
                 cleaned_data[field] = value
+
+        # Set building ID to the filtered list collected in agg_building_id
+        if 'agg_building_id' in cleaned_data:
+            cleaned_data['building_id'] = [building_id for building_id in cleaned_data['agg_building_id'] if building_id]
 
         # Reattach files since the attachment field will only parse the first one
         if self.files:
@@ -1122,6 +1160,12 @@ class AbstractTicketForm(CustomFieldMixin, forms.Form):
 
             if self.form_queue:
                 queryset = queryset.exclude(field_name='queue')
+                
+            form = FormType.objects.get(pk=self.form_id)
+            if form.prepopulate:
+                kwargs.update(prepopulate=True)  
+            elif form.multi_pair:
+                kwargs.update(multi_pair=True)
 
             for field in queryset:
                 if field.field_name in self.fields:

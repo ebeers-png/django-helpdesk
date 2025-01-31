@@ -14,7 +14,7 @@ from django.core.exceptions import (
     ObjectDoesNotExist, PermissionDenied, ImproperlyConfigured,
 )
 from django.urls import reverse
-from django.http import HttpResponseRedirect
+from django.http import HttpResponseRedirect, JsonResponse
 from django.shortcuts import render, get_object_or_404
 from django.utils.http import urlquote
 from django.utils.translation import ugettext as _
@@ -29,8 +29,8 @@ from helpdesk import settings as helpdesk_settings
 from helpdesk.decorators import protect_view, is_helpdesk_staff
 import helpdesk.views.staff as staff
 import helpdesk.views.abstract_views as abstract_views
-from helpdesk.lib import text_is_spam
-from helpdesk.models import Ticket, UserSettings, CustomField, FormType, TicketCC, is_unlisted
+from helpdesk.lib import find_beam_view, text_is_spam
+from helpdesk.models import Ticket, UserSettings, CustomField, FormType, TicketCC, is_extra_data, is_unlisted
 from helpdesk.user import huser_from_request
 
 logger = logging.getLogger(__name__)
@@ -103,6 +103,9 @@ class BaseCreateTicketView(abstract_views.AbstractCreateTicketMixin, FormView):
         return kwargs
 
     def form_valid(self, form):
+        if FormType.objects.get(pk=self.form_id).view_only:
+            return HttpResponseRedirect(reverse('helpdesk:home'))
+
         request = self.request
         if 'description' in form.cleaned_data and text_is_spam(form.cleaned_data['description'], request):
             # This submission is spam. Let's not save it.
@@ -332,6 +335,48 @@ def view_ticket(request):
         'debug': settings.DEBUG,
     })
 
+def evaluate_derived_column(request):
+    building_id = request.POST.get('building_id', None)
+    form_id = request.POST.get("form_id", None)
+    derived_column_field_name = request.POST.get("derived_column_field", None)
+    derived_column_field_name = derived_column_field_name[2:] if derived_column_field_name[0:2] == "e_" else derived_column_field_name
+
+    form = FormType.objects.filter(pk=form_id).first()
+    derived_column_field = form.customfield_set.filter(field_name=derived_column_field_name).select_related('column').first()
+    if not form:
+        return JsonResponse({"status": "error", "error": "Invalid form ID"})
+    
+    if not derived_column_field:
+        return JsonResponse({"status": "error", "error": "Invalid derived column field name"})
+
+    if not derived_column_field.column.derived_column:
+        return JsonResponse({"status": "error", "error": "Column is not a derived column"})
+
+    # map form data to BEAM columns
+    parameters = {}
+    fields = (
+        form.customfield_set.exclude(field_name=derived_column_field_name)
+        .exclude(column__isnull=True)
+        .select_related("column")
+    )
+    for field in fields:
+        field_name = "e_" + field.field_name if is_extra_data(field.field_name) else field.field_name
+        value = request.POST.get(field_name, None)
+        if value not in ['', None]:
+            parameters[field.column.column_name] = value
+
+    # find BEAM inventory view if provided
+    view = None
+    if building_id and form.pull_cycle:
+        building_id_field = form.customfield_set.filter(field_name='building_id').first()
+        if building_id_field and building_id_field.column:
+            view = find_beam_view(form.organization_id, form.pull_cycle, building_id_field.column, building_id)
+
+    return JsonResponse({
+        "status": "success", 
+        "data": derived_column_field.column.derived_column.evaluate_in_sequence(
+                    inventory_view=view, column_parameters=parameters)
+    })
 
 def change_language(request):
     return_to = ''

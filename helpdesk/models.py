@@ -13,6 +13,7 @@ from django.core.exceptions import ObjectDoesNotExist, ValidationError
 from django.db.models.signals import pre_save, post_save
 from django.dispatch import receiver
 from django.db import IntegrityError, models
+from django.db.models import Q
 from django.conf import settings
 from django.utils import timezone
 from django.utils.translation import ugettext_lazy as _, ugettext
@@ -49,6 +50,7 @@ from seed.models import (
     Column,
     Property,
     TaxLot,
+    Cycle
 )
 from seed.utils.storage import get_media_url
 
@@ -398,7 +400,15 @@ class FormType(models.Model):
     unlisted = models.BooleanField(_('Unlisted'), blank=False, default=False,
                                    help_text=_('Should this form be hidden from the public form list? '
                                                '(If the "public" option is checked, this form will still be accessible by everyone through the link.)'))
-
+    multi_pair = models.BooleanField(_('Multi-Property Pairing'), blank=False, default=False,
+                                     help_text=_('Should this form allow inputting and pairing multiple building IDs?'))
+    prepopulate=models.BooleanField(_('Prepopulate Form?'), blank=False, default=False,
+                                    help_text=_('Should this form allow prepopulation from a building ID?'))
+    pull_cycle=models.ForeignKey(Cycle, on_delete=models.SET_NULL, null=True, blank=True,
+                                    help_text=_('BEAM Cycle to pull property data from. Required if prepopulate is checked or using derived column fields.'))
+    view_only = models.BooleanField(_('View-Only Form?'), blank=False, default=False,
+                                    help_text=_('Should this form not allow any submissions? Removes the submit button from the form.'))
+    
     # Add Preset Form Fields to the Database, avoiding having to run a PSQL command in another terminal window.
     # This will happen automatically upon FormType Creation
 
@@ -408,6 +418,17 @@ class FormType(models.Model):
         # TODO index by organization and id?
         get_latest_by = "created"
         ordering = ('id',)
+        
+        constraints = [
+            models.CheckConstraint(
+                name='multi_pair_or_prepopulate',
+                check=(
+                    Q(multi_pair=True, prepopulate=False) 
+                    | Q(multi_pair=False, prepopulate=True)
+                    | Q(multi_pair=False, prepopulate=False)
+                )
+            )
+        ]
 
     def __str__(self):
         return 'FormType - %s %s' % (self.id, self.name)
@@ -555,7 +576,7 @@ class Ticket(models.Model):
     building_name = models.CharField(max_length=200, blank=True, null=True)
     building_address = models.TextField(blank=True, null=True)
     pm_id = models.CharField(_("Portfolio Manager ID"), max_length=200, blank=True, null=True)
-    building_id = models.CharField(_("Building ID"), max_length=200, blank=True, null=True)
+    building_id = models.JSONField(_("Building ID"), blank=True, null=True)
 
     allow_sending = models.BooleanField(default=True)
 
@@ -2108,6 +2129,7 @@ class CustomField(models.Model):
         ('slug', _('Slug')),
         ('attachment', _('Attachment')),
         ('key_value', _('Key Value')),
+        ('derived_column', _('Derived Column'))
     )
 
     data_type = models.CharField(
@@ -2170,6 +2192,12 @@ class CustomField(models.Model):
                     'Lower numbers are displayed first; higher numbers are listed later'),
         blank=True,
         null=True,
+    )
+    
+    read_only = models.BooleanField(
+        _('Read Only'),
+        help_text=_('Prevent the user from editing this field - useful for showing prepopulated data.'),
+        default=False
     )
 
     def _choices_as_array(self):

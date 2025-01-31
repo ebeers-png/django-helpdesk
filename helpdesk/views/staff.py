@@ -366,7 +366,11 @@ def create_form(request):
                 'queue': formtype.queue,
                 'public': formtype.public,
                 'staff': formtype.staff,
-                'unlisted': formtype.unlisted
+                'unlisted': formtype.unlisted,
+                'multi_pair': formtype.multi_pair,
+                'prepopulate': formtype.prepopulate,
+                'pull_cycle': formtype.pull_cycle,
+                'view_only': formtype.view_only
             },
             initial_customfields = CustomField.objects.filter(ticket_form=formtype),
             organization = org,
@@ -392,6 +396,10 @@ def create_form(request):
             formtype.public = form.cleaned_data['public']
             formtype.staff = form.cleaned_data['staff']
             formtype.unlisted = form.cleaned_data['unlisted']
+            formtype.multi_pair = form.cleaned_data['multi_pair']
+            formtype.prepopulate = form.cleaned_data['prepopulate']
+            formtype.pull_cycle = form.cleaned_data['pull_cycle']
+            formtype.view_only = form.cleaned_data['view_only']
             formtype.save()
 
             if formset.is_valid():
@@ -418,6 +426,7 @@ def create_form(request):
                     customfield.public = cf['public']
                     customfield.column = cf['column']
                     customfield.lookup = cf['lookup']
+                    customfield.read_only = cf['read_only']
                     if not customfield.created: customfield.created = datetime.now()
                     customfield.modified = datetime.now()
                     customfield.ticket_form = formtype
@@ -449,6 +458,10 @@ def edit_form(request, pk):
                 'public': formtype.public,
                 'staff': formtype.staff,
                 'unlisted': formtype.unlisted,
+                'multi_pair': formtype.multi_pair,
+                'prepopulate': formtype.prepopulate,
+                'pull_cycle': formtype.pull_cycle,
+                'view_only': formtype.view_only
             },
             initial_customfields=CustomField.objects.filter(ticket_form=formtype).prefetch_related('parent_fields'),
             organization=formtype.organization,
@@ -466,6 +479,7 @@ def edit_form(request, pk):
         form = EditFormTypeForm(request.POST, organization=formtype.organization, initial_customfields=initial_customfields)
         formset = form.CustomFieldFormSet(request.POST)
 
+        dependency_error = False
         try:
             with transaction.atomic():
                 if form.is_valid():
@@ -476,13 +490,16 @@ def edit_form(request, pk):
                     formtype.public = form.cleaned_data['public']
                     formtype.staff = form.cleaned_data['staff']
                     formtype.unlisted = form.cleaned_data['unlisted']
+                    formtype.multi_pair = form.cleaned_data['multi_pair']
+                    formtype.prepopulate = form.cleaned_data['prepopulate']
+                    formtype.pull_cycle = form.cleaned_data['pull_cycle']
+                    formtype.view_only = form.cleaned_data['view_only']
                     formtype.save()
 
                     if formset.is_valid():
                         for df in formset.deleted_forms:
                             if df.cleaned_data['id']: df.cleaned_data['id'].delete()
 
-                        dependency_error = False
                         for cf_indx, cf in enumerate(formset.cleaned_data):
                             if not cf or cf['DELETE']:
                                 # continue to next item if form is empty or item is being deleted
@@ -504,6 +521,7 @@ def edit_form(request, pk):
                             customfield.public = cf['public']
                             customfield.column = cf['column']
                             customfield.lookup = cf['lookup']
+                            customfield.read_only = cf['read_only']
                             if not customfield.created: customfield.created = datetime.now()
                             customfield.modified = datetime.now()
                             customfield.ticket_form = formtype
@@ -545,6 +563,9 @@ def edit_form(request, pk):
                 'public': formtype.public,
                 'staff': formtype.staff,
                 'unlisted': formtype.unlisted,
+                'prepopulate': formtype.prepopulate,
+                'pull_cycle': formtype.pull_cycle,
+                'view_only': formtype.view_only
             },
             initial_customfields=CustomField.objects.filter(ticket_form=formtype).prefetch_related('parent_fields'),
             organization=formtype.organization,
@@ -581,6 +602,9 @@ def duplicate_form(request, pk):
         public = formtype.public,
         staff = formtype.staff,
         unlisted = formtype.unlisted,
+        prepopulate = formtype.prepopulate,
+        pull_cycle = formtype.pull_cycle,
+        view_only = formtype.view_only,
         created = datetime.now(),
         updated = datetime.now(),
     )
@@ -2212,6 +2236,9 @@ class CreateTicketView(MustBeStaffMixin, abstract_views.AbstractCreateTicketMixi
         return kwargs
 
     def form_valid(self, form):
+        if FormType.objects.get(pk=self.form_id).view_only:
+            return HttpResponseRedirect(reverse('helpdesk:dashboard'))
+
         self.ticket = form.save(form_id=self.form_id, user=self.request.user if self.request.user.is_authenticated else None)
         if self.request.GET.get('milestone_beam_redirect', False):
             # Pair Ticket to Milestone
@@ -3302,7 +3329,14 @@ def _pair_properties_by_form(request, form, tickets):
             # Creates a query term and pairs it with the value
             # TODO: Check for the data type and cast value as that type before putting it in lookups?
             if f.column.column_name and hasattr(f.column, 'is_extra_data') and f.column.table_name:
-                query_term = 'extra_data__%s' % f.column.column_name if f.column.is_extra_data else f.column.column_name
+                if f.column.is_extra_data:
+                    query_term = 'extra_data__%s' % f.column.column_name
+                else:
+                    query_term = f.column.column_name
+                
+                if isinstance(value, list):
+                    query_term += '__in'
+                
                 lookups[f.column.table_name][query_term] = value
 
         property_lookup, taxlot_lookup = None, None
@@ -3460,14 +3494,14 @@ def load_copy_to_beam(request, ticket_id):
         'properties_per_cycle': properties_per_cycle,
         'taxlots_per_cycle': taxlots_per_cycle,
         'debug': settings.DEBUG,
-    })
-
+    })    
 
 def get_building_data(request, ticket_id):
     """Given a cycle ID and view ID, loads ticket data and state data for the copy_to_beam page."""
     from seed.models import Cycle
     from seed.serializers.properties import PropertyStateSerializer
     from seed.serializers.taxlots import TaxLotStateSerializer
+    from helpdesk.lib import get_beam_state
 
     ticket = get_object_or_404(Ticket, id=ticket_id)
     if request.is_ajax and request.method == "GET":
@@ -3478,12 +3512,8 @@ def get_building_data(request, ticket_id):
         view_id = request.GET.get('view_id', 0)
 
         cycle = Cycle.objects.filter(organization=org, id=cycle_id).first()
-        if inventory_type == 'PropertyState':
-            view = PropertyView.objects.filter(state__organization=org, id=view_id).first()
-            state = PropertyStateSerializer(view.state).data
-        else:
-            view = TaxLotView.objects.filter(state__organization=org, id=view_id).first()
-            state = TaxLotStateSerializer(view.state).data
+        state = get_beam_state(org.id, view_id, inventory_type)
+        
         ticket_data = []
         beam_data = []
         if cycle:
@@ -3554,7 +3584,6 @@ def get_building_data(request, ticket_id):
             "ticket_data": ticket_data,
             'beam_data': beam_data
         }, status=200)
-
 
 def update_building_data(request, ticket_id):
     """
