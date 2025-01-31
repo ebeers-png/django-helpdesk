@@ -2108,6 +2108,7 @@ class CustomField(models.Model):
         ('slug', _('Slug')),
         ('attachment', _('Attachment')),
         ('key_value', _('Key Value')),
+        ('checkbox_list', _('Checkbox List')),
     )
 
     data_type = models.CharField(
