@@ -49,6 +49,7 @@ from seed.models import (
     Column,
     Property,
     TaxLot,
+    Cycle
 )
 from seed.utils.storage import get_media_url
 
@@ -398,7 +399,13 @@ class FormType(models.Model):
     unlisted = models.BooleanField(_('Unlisted'), blank=False, default=False,
                                    help_text=_('Should this form be hidden from the public form list? '
                                                '(If the "public" option is checked, this form will still be accessible by everyone through the link.)'))
-
+    prepopulate=models.BooleanField(_('Prepopulate Form?'), blank=False, default=False,
+                                    help_text=_('Should this form allow prepopulation from a building ID?'))
+    pull_cycle=models.ForeignKey(Cycle, on_delete=models.SET_NULL, null=True, blank=True,
+                                    help_text=_('BEAM Cycle to pull property data from. Required if prepopulate is checked or using derived column fields.'))
+    view_only = models.BooleanField(_('View-Only Form?'), blank=False, default=False,
+                                    help_text=_('Should this form not allow any submissions? Removes the submit button from the form.'))
+    
     # Add Preset Form Fields to the Database, avoiding having to run a PSQL command in another terminal window.
     # This will happen automatically upon FormType Creation
 
@@ -2108,6 +2115,7 @@ class CustomField(models.Model):
         ('slug', _('Slug')),
         ('attachment', _('Attachment')),
         ('key_value', _('Key Value')),
+        ('derived_column', _('Derived Column'))
     )
 
     data_type = models.CharField(
@@ -2170,6 +2178,12 @@ class CustomField(models.Model):
                     'Lower numbers are displayed first; higher numbers are listed later'),
         blank=True,
         null=True,
+    )
+    
+    read_only = models.BooleanField(
+        _('Read Only'),
+        help_text=_('Prevent the user from editing this field - useful for showing prepopulated data.'),
+        default=False
     )
 
     def _choices_as_array(self):
