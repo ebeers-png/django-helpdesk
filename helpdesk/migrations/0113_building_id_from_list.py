@@ -3,6 +3,10 @@
 from django.db import migrations, models
 
 def building_id_from_list(apps, schema_editor):
+    """
+    If a ticket's `building_id` value is a list, replace its value with the first
+    ID in the list.
+    """
     Ticket = apps.get_model('helpdesk', 'Ticket')
     
     for ticket in Ticket.objects.filter(building_id__isnull=False):
@@ -13,7 +17,7 @@ def building_id_from_list(apps, schema_editor):
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('helpdesk', '0111_alter_ticket_building_id'),
+        ('helpdesk', '0112_alter_ticket_building_id'),
     ]
 
     operations = [

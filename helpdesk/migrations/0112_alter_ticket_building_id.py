@@ -6,7 +6,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('helpdesk', '0110_multi_pair'),
+        ('helpdesk', '0111_prepare_ticket_building_id'),
     ]
 
     operations = [
