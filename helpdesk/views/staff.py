@@ -3526,6 +3526,13 @@ def get_building_data(request, ticket_id):
                     elif hasattr(ticket, f.field_name) \
                             and getattr(ticket, f.field_name, None) is not None and getattr(ticket, f.field_name, None) != '':
                         value = getattr(ticket, f.field_name, None)
+
+                        # Use property ID instead of ticket value for lists of IDs
+                        if f.field_name == 'building_id' and isinstance(value, list):
+                            if f.column.is_extra_data and f.column.column_name in state['extra_data']:
+                                value = state['extra_data'][f.column.column_name]
+                            elif not f.column.is_extra_data and f.column.column_name in state:
+                                value = state[f.column.column_name]
                     else:
                         value = ''
 
