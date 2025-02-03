@@ -50,6 +50,7 @@ from seed.models import (
     Column,
     Property,
     TaxLot,
+    Portfolio,
     Cycle
 )
 from seed.utils.storage import get_media_url
@@ -564,6 +565,8 @@ class Ticket(models.Model):
                                            verbose_name='BEAM Property')
     beam_taxlot = models.ManyToManyField(TaxLot, blank=True, related_name='helpdesk_ticket',  # TODO make plural
                                          verbose_name='BEAM Taxlot')  # TODO hide prop/taxlot from form fields
+    beam_portfolio = models.ManyToManyField(Portfolio, blank=True, related_name='helpdesk_ticket', # TODO make plural
+                                            verbose_name='BEAM Portfolio')
     tags = models.ManyToManyField(Tag, blank=True, related_name="tickets")
 
     # Contains extra fields, determined by items in CustomField
