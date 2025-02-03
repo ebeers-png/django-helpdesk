@@ -135,7 +135,7 @@ urlpatterns = [
         staff.attachment_del,
         name='attachment_del'),
 
-    url(r'^tickets/(?P<ticket_id>[0-9]+)/beam_unpair/(?P<inventory_type>(property|taxlot))/(?P<inventory_id>[0-9]+)/$',
+    url(r'^tickets/(?P<ticket_id>[0-9]+)/beam_unpair/(?P<inventory_type>(property|taxlot|portfolio))/(?P<inventory_id>[0-9]+)/$',
         staff.beam_unpair,
         name='ticket_beam_unpair'),
 

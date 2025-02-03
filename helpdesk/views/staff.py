@@ -76,7 +76,7 @@ from datetime import timedelta, datetime
 
 from ..templated_email import send_templated_mail
 
-from seed.models import PropertyView, Property, TaxLotView, TaxLot, Column
+from seed.models import PropertyView, Property, TaxLotView, TaxLot, PortfolioView, Portfolio, Column
 from post_office.models import STATUS, Email
 from urllib.parse import urlparse, urlunparse
 from django.http import QueryDict
@@ -1044,12 +1044,17 @@ def view_ticket(request, ticket_id):
     else:
         taxlot_display_query = 'state__address_line_1'
 
+    portfolio_display_query = 'portfolio__name'
+
     properties = list(
         PropertyView.objects.filter(property_id__in=ticket.beam_property.all().values_list('id', flat=True))
         .order_by('property_id', '-cycle__end').distinct('property_id').values('id', 'property_id', address=F(prop_display_query)))
     taxlots = list(
         TaxLotView.objects.filter(taxlot_id__in=ticket.beam_taxlot.all().values_list('id', flat=True))
         .order_by('taxlot_id', '-cycle__end').distinct('taxlot_id').values('id', 'taxlot_id', address=F(taxlot_display_query)))
+    portfolios = list(
+        PortfolioView.objects.filter(portfolio_id__in=ticket.beam_portfolio.all().values_list('id', flat=True))
+        .order_by('portfolio_id', '-cycle__end').distinct('portfolio_id').values('id', 'portfolio_id', address=F(portfolio_display_query)))
 
     for p in properties:
         if p['address'] is None or p['address'] == '':
@@ -1072,6 +1077,7 @@ def view_ticket(request, ticket_id):
         'extra_data': extra_data,
         'properties': properties,
         'taxlots': taxlots,
+        'portfolios': portfolios,
         'is_staff': is_helpdesk_staff(request.user),
         'debug': settings.DEBUG,
     })
@@ -3119,9 +3125,12 @@ def beam_unpair(request, ticket_id, inventory_type, inventory_id):
     if inventory_type == 'property':
         prop = get_object_or_404(Property, id=inventory_id)
         ticket.beam_property.remove(prop)
-    else:
+    elif inventory_type == 'taxlot':
         taxlot = get_object_or_404(TaxLot, id=inventory_id)
         ticket.beam_taxlot.remove(taxlot)
+    else:
+        portfolio = get_object_or_404(Portfolio, id=inventory_id)
+        ticket.beam_portfolio.remove(portfolio)
 
     return HttpResponseRedirect(reverse('helpdesk:view', args=[ticket_id]))
 
@@ -3294,7 +3303,7 @@ def batch_pair_properties_tickets(request, ticket_ids):
 
 @staff_member_required
 def _pair_properties_by_form(request, form, tickets):
-    from seed.models import PropertyState, TaxLotState, TaxLotView, PropertyView, Cycle
+    from seed.models import PropertyState, TaxLotState, PortfolioState, TaxLotView, PropertyView, PortfolioView, Cycle
 
     org = form.organization.id
     fields = form.customfield_set.exclude(column__isnull=True).exclude(lookup=False).select_related("column")
@@ -3305,8 +3314,10 @@ def _pair_properties_by_form(request, form, tickets):
             possible_views = view.objects.filter(cycle=cycle)
             if view == PropertyView:
                 states = state.objects.filter(propertyview__in=possible_views).filter(**query)
-            else:
+            elif view == TaxLotView:
                 states = state.objects.filter(taxlotview__in=possible_views).filter(**query)
+            elif view == PortfolioView:
+                states = state.objects.filter(portfolioview__in=possible_views).filter(**query)
             buildings = building.objects.filter(views__state__in=states).distinct('pk')
             if buildings:
                 return buildings
@@ -3339,7 +3350,7 @@ def _pair_properties_by_form(request, form, tickets):
                 
                 lookups[f.column.table_name][query_term] = value
 
-        property_lookup, taxlot_lookup = None, None
+        property_lookup, taxlot_lookup= None, None
         for c in cycles:
             # if statement checks that if there's a prop query, there should be prop views in that cycle, as well as
             # taxlot views if there's a taxlot query. if no queries, it doesn't matter whether it has views in that cycle.
@@ -3347,6 +3358,13 @@ def _pair_properties_by_form(request, form, tickets):
                 property_lookup = lookup(lookups['PropertyState'], PropertyState, PropertyView, c, Property)
                 if property_lookup:
                     ticket.beam_property.add(*property_lookup)
+
+                    # Pair portfolios from properties
+                    portfolio_lookup = lookup(
+                        {'portfolioview__properties__property_view__property__in': property_lookup},
+                        PortfolioState, PortfolioView, c, Portfolio
+                    )
+                    ticket.beam_portfolio.add(*portfolio_lookup)
 
             if not taxlot_lookup and lookups['TaxLotState'] and TaxLotView.objects.filter(cycle=c).exists():
                 taxlot_lookup = lookup(lookups['TaxLotState'], TaxLotState, TaxLotView, c, TaxLot)

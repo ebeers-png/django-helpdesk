@@ -221,8 +221,20 @@ copy_public_link = function() {
                         </td>
                     </tr>
                     <tr>
+                        <th class="table-active">{% trans "Portfolios Paired" %}</th>
+                        <td>
+                            {% for portfolio in portfolios %}
+                            <div style="display:flex;justify-content:space-between;">
+                                <div><a href="{% url 'seed:home' %}#/portfolios" target="_blank" rel="noopener noreferrer">{{ portfolio.address }}</a></div>
+                                <div style="flex-shrink:0;">
+                                    <a href="{% url 'helpdesk:ticket_beam_unpair' ticket.id 'portfolio' portfolio.portfolio_id %}" data-toggle="tooltip" title="Unpair {{ portfolio.address }}"><button type="button" class="btn btn-warning btn-sm"><i class="fas fa-unlink"></i></button></a>
+                                    
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </td>
                         <th class="table-active">{% trans "Attachments" %}</th>
-                        <td colspan="3">
+                        <td>
                             <ul>
                             {% for followup in ticket.followup_set.all %}
                             {% for attachment in followup.followupattachment_set.all %}
