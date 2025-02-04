@@ -57,6 +57,7 @@ from helpdesk.lib import (
     safe_template_context,
     process_attachments,
     queue_template_context,
+    pair_properties_by_form
 )
 from helpdesk.models import (
     DependsOn, Ticket, Queue, FollowUp, TimeSpent, TicketChange, PreSetReply, FollowUpAttachment, SavedSearch,
@@ -3289,7 +3290,7 @@ def pair_property_ticket(request, ticket_id):
     TODO: Use celery to have building lookup & pairing happen in the background.
     """
     ticket = get_object_or_404(Ticket, id=ticket_id)
-    _pair_properties_by_form(request, ticket.ticket_form, [ticket])
+    pair_properties_by_form(request, ticket.ticket_form, [ticket])
     return redirect(ticket)
 
 
@@ -3304,84 +3305,9 @@ def batch_pair_properties_tickets(request, ticket_ids):
         forms[t.ticket_form_id]['tickets'].append(t)
 
     for f in forms.values():
-        _pair_properties_by_form(request, f['form'], f['tickets'])
+        pair_properties_by_form(request, f['form'], f['tickets'])
 
     return HttpResponseRedirect(reverse('helpdesk:list'))
-
-
-@staff_member_required
-def _pair_properties_by_form(request, form, tickets):
-    from seed.models import PropertyState, TaxLotState, PortfolioState, TaxLotView, PropertyView, PortfolioView, Cycle
-
-    org = form.organization.id
-    fields = form.customfield_set.exclude(column__isnull=True).exclude(lookup=False).select_related("column")
-
-    def lookup(query, state, view, cycle, building):
-        """ Queries database for either properties or taxlots. """
-        if query and cycle:
-            possible_views = view.objects.filter(cycle=cycle)
-            if view == PropertyView:
-                states = state.objects.filter(propertyview__in=possible_views).filter(**query)
-            elif view == TaxLotView:
-                states = state.objects.filter(taxlotview__in=possible_views).filter(**query)
-            elif view == PortfolioView:
-                states = state.objects.filter(portfolioview__in=possible_views).filter(**query)
-            buildings = building.objects.filter(views__state__in=states).distinct('pk')
-            if buildings:
-                return buildings
-        return None
-
-    cycles = Cycle.objects.filter(organization_id=org, end__isnull=False).order_by('end')
-    for ticket in tickets:
-        lookups = {'PropertyState': {}, 'TaxLotState': {}}
-        for f in fields:
-            # Locates value from ticket that will be searched for in BEAM
-            if f.field_name in ticket.extra_data \
-                    and ticket.extra_data[f.field_name] is not None and ticket.extra_data[f.field_name] != '':
-                value = ticket.extra_data[f.field_name]
-            elif hasattr(ticket, f.field_name) \
-                    and getattr(ticket, f.field_name, None) is not None and getattr(ticket, f.field_name, None) != '':
-                value = getattr(ticket, f.field_name, None)
-            else:
-                continue
-
-            # Creates a query term and pairs it with the value
-            # TODO: Check for the data type and cast value as that type before putting it in lookups?
-            if f.column.column_name and hasattr(f.column, 'is_extra_data') and f.column.table_name:
-                if f.column.is_extra_data:
-                    query_term = 'extra_data__%s' % f.column.column_name
-                else:
-                    query_term = f.column.column_name
-                
-                if isinstance(value, list):
-                    query_term += '__in'
-                
-                lookups[f.column.table_name][query_term] = value
-
-        property_lookup, taxlot_lookup= None, None
-        for c in cycles:
-            # if statement checks that if there's a prop query, there should be prop views in that cycle, as well as
-            # taxlot views if there's a taxlot query. if no queries, it doesn't matter whether it has views in that cycle.
-            if not property_lookup and lookups['PropertyState'] and PropertyView.objects.filter(cycle=c).exists():
-                property_lookup = lookup(lookups['PropertyState'], PropertyState, PropertyView, c, Property)
-                if property_lookup:
-                    ticket.beam_property.add(*property_lookup)
-
-                    # Pair portfolios from properties
-                    portfolio_lookup = lookup(
-                        {'portfolioview__properties__property_view__property__in': property_lookup},
-                        PortfolioState, PortfolioView, c, Portfolio
-                    )
-                    ticket.beam_portfolio.add(*portfolio_lookup)
-
-            if not taxlot_lookup and lookups['TaxLotState'] and TaxLotView.objects.filter(cycle=c).exists():
-                taxlot_lookup = lookup(lookups['TaxLotState'], TaxLotState, TaxLotView, c, TaxLot)
-                if taxlot_lookup:
-                    ticket.beam_taxlot.add(*taxlot_lookup)
-
-            if (not (lookups['PropertyState'] and not property_lookup)) and \
-                    (not (lookups['TaxLotState'] and not taxlot_lookup)):
-                break
 
 
 @staff_member_required

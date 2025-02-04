@@ -14,7 +14,11 @@ from django.utils.encoding import smart_text
 from helpdesk.models import FollowUpAttachment, FormType, is_extra_data
 from seed.serializers.properties import PropertyStateSerializer
 from seed.serializers.taxlots import TaxLotStateSerializer
-from seed.models import PropertyView, TaxLotView
+from seed.models import (
+    PropertyState, TaxLotState, PortfolioState, 
+    PropertyView, TaxLotView, PortfolioView, 
+    Property, TaxLot, Portfolio, Cycle
+)
 
 logger = logging.getLogger(__name__)
 
@@ -240,3 +244,74 @@ def map_form_fields_to_state_data(state_data, form_id, inventory_type):
                     beam_data[field_name] = value   
             
     return beam_data
+
+def pair_properties_by_form(request, form, tickets):
+    org = form.organization.id
+    fields = form.customfield_set.exclude(column__isnull=True).exclude(lookup=False).select_related("column")
+
+    def lookup(query, state, view, cycle, building):
+        """ Queries database for either properties or taxlots. """
+        if query and cycle:
+            possible_views = view.objects.filter(cycle=cycle)
+            if view == PropertyView:
+                states = state.objects.filter(propertyview__in=possible_views).filter(**query)
+            elif view == TaxLotView:
+                states = state.objects.filter(taxlotview__in=possible_views).filter(**query)
+            elif view == PortfolioView:
+                states = state.objects.filter(portfolioview__in=possible_views).filter(**query)
+            buildings = building.objects.filter(views__state__in=states).distinct('pk')
+            if buildings:
+                return buildings
+        return None
+
+    cycles = Cycle.objects.filter(organization_id=org, end__isnull=False).order_by('end')
+    for ticket in tickets:
+        lookups = {'PropertyState': {}, 'TaxLotState': {}}
+        for f in fields:
+            # Locates value from ticket that will be searched for in BEAM
+            if f.field_name in ticket.extra_data \
+                    and ticket.extra_data[f.field_name] is not None and ticket.extra_data[f.field_name] != '':
+                value = ticket.extra_data[f.field_name]
+            elif hasattr(ticket, f.field_name) \
+                    and getattr(ticket, f.field_name, None) is not None and getattr(ticket, f.field_name, None) != '':
+                value = getattr(ticket, f.field_name, None)
+            else:
+                continue
+
+            # Creates a query term and pairs it with the value
+            # TODO: Check for the data type and cast value as that type before putting it in lookups?
+            if f.column.column_name and hasattr(f.column, 'is_extra_data') and f.column.table_name:
+                if f.column.is_extra_data:
+                    query_term = 'extra_data__%s' % f.column.column_name
+                else:
+                    query_term = f.column.column_name
+                
+                if isinstance(value, list):
+                    query_term += '__in'
+                
+                lookups[f.column.table_name][query_term] = value
+
+        property_lookup, taxlot_lookup= None, None
+        for c in cycles:
+            # if statement checks that if there's a prop query, there should be prop views in that cycle, as well as
+            # taxlot views if there's a taxlot query. if no queries, it doesn't matter whether it has views in that cycle.
+            if not property_lookup and lookups['PropertyState'] and PropertyView.objects.filter(cycle=c).exists():
+                property_lookup = lookup(lookups['PropertyState'], PropertyState, PropertyView, c, Property)
+                if property_lookup:
+                    ticket.beam_property.add(*property_lookup)
+
+                    # Pair portfolios from properties
+                    portfolio_lookup = lookup(
+                        {'portfolioview__properties__property_view__property__in': property_lookup},
+                        PortfolioState, PortfolioView, c, Portfolio
+                    )
+                    ticket.beam_portfolio.add(*portfolio_lookup)
+
+            if not taxlot_lookup and lookups['TaxLotState'] and TaxLotView.objects.filter(cycle=c).exists():
+                taxlot_lookup = lookup(lookups['TaxLotState'], TaxLotState, TaxLotView, c, TaxLot)
+                if taxlot_lookup:
+                    ticket.beam_taxlot.add(*taxlot_lookup)
+
+            if (not (lookups['PropertyState'] and not property_lookup)) and \
+                    (not (lookups['TaxLotState'] and not taxlot_lookup)):
+                break

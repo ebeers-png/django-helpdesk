@@ -22,7 +22,7 @@ from django.contrib.auth import get_user_model
 from django.utils import timezone
 from django.shortcuts import get_object_or_404
 
-from helpdesk.lib import safe_template_context, process_attachments
+from helpdesk.lib import safe_template_context, process_attachments, pair_properties_by_form
 from helpdesk.models import (DependsOn, Ticket, Queue, FollowUp, IgnoreEmail, TicketCC,
                              CustomField, TicketDependency, UserSettings, KBItem, Tag,
                              FormType, KBCategory, KBIAttachment, is_extra_data, PreSetReply, EmailTemplate, clean_html)
@@ -1083,6 +1083,15 @@ class AbstractTicketForm(CustomFieldMixin, forms.Form):
             building_id=self.cleaned_data.get('building_id', None),
             extra_data=extra_data
         )
+
+        # TODO: auto pair / copy
+        if ticket_form.auto_pair:
+            pair_properties_by_form(None, ticket_form, [ticket])
+            paired = ticket.beam_property.count() or ticket.beam_taxlot.count() or ticket.beam_portfolio.count()
+
+            if paired and ticket_form.auto_copy:
+                pass
+                # update_building_data(None, ticket.id)
 
         return ticket, queue
 
