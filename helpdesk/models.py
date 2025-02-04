@@ -407,10 +407,13 @@ class FormType(models.Model):
                                     help_text=_('Should this form allow prepopulation from a building ID?'))
     pull_cycle = models.ForeignKey(Cycle, on_delete=models.SET_NULL, null=True, blank=True, related_name='pull_forms',
                                     help_text=_('BEAM Cycle to pull property data from. Required if prepopulate is checked or using derived column fields.'))
-    auto_pair = models.BooleanField(_('Automatically Pair'), blank=False, default=False,
+    auto_pair = models.BooleanField(_('Automatically Pair?'), blank=False, default=False,
                                     help_text=_('Should form submissions automatically attempt to pair with the BEAM inventory?'))
-    auto_copy = models.BooleanField(_('Automatically Copy to Beam'), blank=False, default=False,
-                                    help_text=_('Should form submissions automatically copy data to the paired BEAM property or tax lot?'))
+    auto_copy = models.BooleanField(_('Automatically Copy to BEAM?'), blank=False, default=False,
+                                    help_text=_('Should form submissions automatically copy data to the paired BEAM property or tax lot? ' 
+                                                'If multi-property pairing is checked, property fields will be copied to all paired properties.'))
+    auto_create_portfolio = models.BooleanField(_('Automatically Create Portfolio?'), blank=False, default=False,
+                                                help_text=(_('Should form submissions automatically create BEAM portfolio from the paired properties?')))
     push_cycle = models.ForeignKey(Cycle, on_delete=models.SET_NULL, null=True, blank=True, related_name='push_forms',
                                     help_text=_('BEAM Cycle to push property data to. Required if automatically copying data or creating portfolios.'))
     view_only = models.BooleanField(_('View-Only Form?'), blank=False, default=False,
@@ -441,7 +444,7 @@ class FormType(models.Model):
                     | Q(auto_copy=True, auto_pair=True)
                 ),
                 name='form_auto_pair_if_auto_copy'
-            )
+            ),
         ]
 
     def __str__(self):

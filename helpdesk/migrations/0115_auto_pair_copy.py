@@ -25,12 +25,17 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='formtype',
             name='auto_copy',
-            field=models.BooleanField(default=False, help_text='Should form submissions automatically copy data to the paired BEAM property or tax lot?', verbose_name='Automatically Copy to Beam'),
+            field=models.BooleanField(default=False, help_text='Should form submissions automatically copy data to the paired BEAM property or tax lot? If multi-property pairing is checked, property fields will be copied to all paired properties.', verbose_name='Automatically Copy to BEAM?'),
         ),
         migrations.AddField(
             model_name='formtype',
             name='auto_pair',
-            field=models.BooleanField(default=False, help_text='Should form submissions automatically attempt to pair with the BEAM inventory?', verbose_name='Automatically Pair'),
+            field=models.BooleanField(default=False, help_text='Should form submissions automatically attempt to pair with the BEAM inventory?', verbose_name='Automatically Pair?'),
+        ),
+        migrations.AddField(
+            model_name='formtype',
+            name='auto_create_portfolio',
+            field=models.BooleanField(default=False, help_text='Should form submissions automatically create BEAM portfolio from the paired properties?', verbose_name='Automatically Create Portfolio?'),
         ),
         migrations.AddField(
             model_name='customfield',
