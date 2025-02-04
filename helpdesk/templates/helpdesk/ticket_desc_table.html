@@ -42,7 +42,12 @@ copy_public_link = function() {
                                     {% else %} class="btn btn-primary btn-sm" {% endif %}>
                                     <i class="fa fa-share-square"></i> {% trans "Copy data to BEAM" %}
                                 </a></span>
-
+                                {% if not ticket.beam_property.count %} <span class="tooltip-wrapper" data-toggle="tooltip" data-placement="top" title="Must be paired to a BEAM property."> {% else %} <span> {% endif %}
+                                <a href="{% url 'helpdesk:create_portfolio' ticket.id %}"
+                                    {% if not ticket.beam_property.count %} class="btn btn-secondary btn-sm disabled" aria-disabled="true"
+                                    {% else %} class="btn btn-primary btn-sm" {% endif %}>
+                                    <i class="fa fa-share-square"></i> {% trans "Create Portfolio in BEAM" %}
+                                </a></span>
                                 {% if ticket.property_milestones.count > 0 %}
                                 <button type="button" id="milestoneButton" class="btn btn-primary btn-sm dropdown-toggle" data-toggle="dropdown"><i class="fas fa-road"></i> {% trans "View Milestone(s)" %}</button>
                                 <div class="dropdown-menu" aria-labelledby="milestoneButton">

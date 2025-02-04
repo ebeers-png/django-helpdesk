@@ -3667,6 +3667,54 @@ def update_building_data(request, ticket_id):
         response = viewset.update(update_request, pk=view.id)
         return response
 
+def load_create_portfolio(request, ticket_id):
+    """
+    Loads a page for creating a BEAM portfolio from a ticket
+    """
+    ticket = get_object_or_404(Ticket, id=ticket_id)
+    org = ticket.ticket_form.organization
+
+    prop_display_column = Column.objects.filter(organization=org, column_name=org.property_display_field, table_name='PropertyState').first()
+    if prop_display_column:
+        prop_display_query = f'state__extra_data__{prop_display_column.column_name}' if prop_display_column.is_extra_data else f'state__{prop_display_column.column_name}'
+    else:
+        prop_display_query = 'state__address_line_1'
+
+    taxlot_display_column = Column.objects.filter(organization=org, column_name=org.taxlot_display_field, table_name='TaxLotState').first()
+    if taxlot_display_column:
+        taxlot_display_query = f'state__extra_data__{taxlot_display_column.column_name}' if taxlot_display_column.is_extra_data else f'state__{taxlot_display_column.column_name}'
+    else:
+        taxlot_display_query = 'state__address_line_1'
+
+    properties_per_cycle = {}
+    views = PropertyView.objects.filter(property__in=ticket.beam_property.all()) \
+        .annotate(address=F(prop_display_query), building_id=F('state__pm_property_id')).only('id', 'cycle')
+    for view in views:
+        if view.cycle not in properties_per_cycle:
+            properties_per_cycle[view.cycle] = [view]
+        else:
+            properties_per_cycle[view.cycle].append(view)
+
+    taxlots_per_cycle = {}
+    views = TaxLotView.objects.filter(taxlot__in=ticket.beam_taxlot.all()) \
+        .annotate(address=F(taxlot_display_query), building_id=F('state__jurisdiction_tax_lot_id')).only('state_id', 'cycle')
+    for view in views:
+        if view.cycle not in taxlots_per_cycle:
+            taxlots_per_cycle[view.cycle] = [view]
+        else:
+            taxlots_per_cycle[view.cycle].append(view)
+
+    cycles = set(list(properties_per_cycle.keys()) + list(taxlots_per_cycle.keys()))
+
+    
+    return render(request, 'helpdesk/ticket_create_portfolio.html', {
+        'ticket': ticket,
+        'cycles': cycles,
+        'properties_per_cycle': properties_per_cycle,
+        'taxlots_per_cycle': taxlots_per_cycle,
+        'debug': settings.DEBUG,
+    })
+
 
 def add_remove_label(org_id, user, payload, inventory_type):
     """

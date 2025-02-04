@@ -230,6 +230,10 @@ urlpatterns = [
         staff.load_copy_to_beam,
         name="copy_to_beam"),
 
+    url(r'create_portfolio/(?P<ticket_id>[0-9]+)/$',
+        staff.load_create_portfolio,
+        name="create_portfolio"),
+
     url(r'get_building_data/(?P<ticket_id>[0-9]+)/$',
         staff.get_building_data,
         name="get_building_data"),
