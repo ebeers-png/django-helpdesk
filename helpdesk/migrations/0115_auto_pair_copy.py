@@ -32,6 +32,11 @@ class Migration(migrations.Migration):
             name='auto_pair',
             field=models.BooleanField(default=False, help_text='Should form submissions automatically attempt to pair with the BEAM inventory?', verbose_name='Automatically Pair'),
         ),
+        migrations.AddField(
+            model_name='customfield',
+            name='auto_copy',
+            field=models.BooleanField(default=False, help_text='If the form is set to automatically copy to BEAM, should this field be included?', verbose_name='Include in Automatic Copy?'),
+        ),
         migrations.AddConstraint(
             model_name='formtype',
             constraint=models.CheckConstraint(check=models.Q(('auto_copy', False), models.Q(('auto_copy', True), ('auto_pair', True)), _connector='OR'), name='form_auto_pair_if_auto_copy'),

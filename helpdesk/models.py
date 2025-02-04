@@ -434,10 +434,7 @@ class FormType(models.Model):
                     | Q(multi_pair=False, prepopulate=True)
                     | Q(multi_pair=False, prepopulate=False)
                 )
-            )
-        ]
-
-        constraints=[
+            ),
             models.CheckConstraint(
                 check=(
                     Q(auto_copy=False)
@@ -2235,6 +2232,7 @@ class CustomField(models.Model):
     ticket_form = models.ForeignKey(FormType, on_delete=models.CASCADE)
     column = models.ForeignKey(Column, blank=True, null=True, on_delete=models.SET_NULL, related_name='helpdesk_fields', verbose_name=_('Associated BEAM column'))
     lookup = models.BooleanField('Use for BEAM pairings?', help_text=_('Use the value in this field to pair tickets with BEAM properties/taxlots?'), default=False)
+    auto_copy = models.BooleanField('Include in Automatic Copy?', help_text=_('If the form is set to automatically copy to BEAM, should this field be included?'), default=False)
 
     created = models.DateTimeField(auto_now_add=True)
     modified = models.DateTimeField(auto_now=True)
