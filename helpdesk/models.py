@@ -403,10 +403,12 @@ class FormType(models.Model):
                                                '(If the "public" option is checked, this form will still be accessible by everyone through the link.)'))
     multi_pair = models.BooleanField(_('Multi-Property Pairing'), blank=False, default=False,
                                      help_text=_('Should this form allow inputting and pairing multiple building IDs?'))
-    prepopulate=models.BooleanField(_('Prepopulate Form?'), blank=False, default=False,
+    prepopulate = models.BooleanField(_('Prepopulate Form?'), blank=False, default=False,
                                     help_text=_('Should this form allow prepopulation from a building ID?'))
-    pull_cycle=models.ForeignKey(Cycle, on_delete=models.SET_NULL, null=True, blank=True,
+    pull_cycle = models.ForeignKey(Cycle, on_delete=models.SET_NULL, null=True, blank=True, related_name='pull_forms',
                                     help_text=_('BEAM Cycle to pull property data from. Required if prepopulate is checked or using derived column fields.'))
+    push_cycle = models.ForeignKey(Cycle, on_delete=models.SET_NULL, null=True, blank=True, related_name='push_forms',
+                                    help_text=_('BEAM Cycle to push property data to. Required if automatically copying data or creating portfolios.'))
     view_only = models.BooleanField(_('View-Only Form?'), blank=False, default=False,
                                     help_text=_('Should this form not allow any submissions? Removes the submit button from the form.'))
     
