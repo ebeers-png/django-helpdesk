@@ -370,6 +370,8 @@ def create_form(request):
                 'multi_pair': formtype.multi_pair,
                 'prepopulate': formtype.prepopulate,
                 'pull_cycle': formtype.pull_cycle,
+                'auto_pair': formtype.auto_pair,
+                'auto_copy': formtype.auto_copy,
                 'view_only': formtype.view_only
             },
             initial_customfields = CustomField.objects.filter(ticket_form=formtype),
@@ -399,6 +401,8 @@ def create_form(request):
             formtype.multi_pair = form.cleaned_data['multi_pair']
             formtype.prepopulate = form.cleaned_data['prepopulate']
             formtype.pull_cycle = form.cleaned_data['pull_cycle']
+            formtype.auto_pair = form.cleaned_data['auto_pair']
+            formtype.auto_pair = form.cleaned_data['auto_copy']
             formtype.view_only = form.cleaned_data['view_only']
             formtype.save()
 
@@ -461,6 +465,8 @@ def edit_form(request, pk):
                 'multi_pair': formtype.multi_pair,
                 'prepopulate': formtype.prepopulate,
                 'pull_cycle': formtype.pull_cycle,
+                'auto_pair': formtype.auto_pair,
+                'auto_copy': formtype.auto_copy,
                 'view_only': formtype.view_only
             },
             initial_customfields=CustomField.objects.filter(ticket_form=formtype).prefetch_related('parent_fields'),
@@ -493,6 +499,8 @@ def edit_form(request, pk):
                     formtype.multi_pair = form.cleaned_data['multi_pair']
                     formtype.prepopulate = form.cleaned_data['prepopulate']
                     formtype.pull_cycle = form.cleaned_data['pull_cycle']
+                    formtype.auto_pair = form.cleaned_data['auto_pair']
+                    formtype.auto_pair = form.cleaned_data['auto_copy']
                     formtype.view_only = form.cleaned_data['view_only']
                     formtype.save()
 

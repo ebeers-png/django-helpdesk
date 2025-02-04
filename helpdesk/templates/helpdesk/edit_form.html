@@ -112,6 +112,22 @@
         }
     }
 
+    // Only allow auto_copy if auto_pair is checked
+    let auto_pair_input = $('#id_auto_pair')
+    let auto_copy_input = $('#id_auto_copy')
+    
+    auto_pair_input.on('click', checkDisableCopy)
+
+    function checkDisableCopy() {
+        if (auto_pair_input.prop('checked')) {
+            auto_copy_input.attr('disabled', false)
+        } else {
+            auto_copy_input.attr('disabled', true)
+            auto_copy_input.prop('checked', false)
+        }
+    }
+    checkDisableCopy()
+
     function removeEmpty() {
         if (document.querySelector('#edit_form').checkValidity()) {
             document.querySelector('#custom_field_empty').remove()

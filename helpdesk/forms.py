@@ -669,9 +669,11 @@ class EditFormTypeForm(forms.ModelForm):
             .exclude(table_name=None) \
             .order_by('column_name')
         
-        self.fields['pull_cycle'].queryset = Cycle.objects.filter(organization_id=self.org) \
-                                                        .exclude(supercycle__isnull=False) \
-                                                        .order_by('end')
+        cycles = Cycle.objects.filter(organization_id=self.org) \
+                              .exclude(supercycle__isnull=False) \
+                              .order_by('end')
+        self.fields['pull_cycle'].queryset = cycles
+        self.fields['push_cycle'].queryset = cycles
 
         self.copy_queryset = FormType.objects.filter(organization = self.org).exclude(pk=self.pk)
 

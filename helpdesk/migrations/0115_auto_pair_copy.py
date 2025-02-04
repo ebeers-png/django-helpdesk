@@ -22,4 +22,18 @@ class Migration(migrations.Migration):
             name='pull_cycle',
             field=models.ForeignKey(blank=True, help_text='BEAM Cycle to pull property data from. Required if prepopulate is checked or using derived column fields.', null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='pull_forms', to='seed.cycle'),
         ),
+        migrations.AddField(
+            model_name='formtype',
+            name='auto_copy',
+            field=models.BooleanField(default=False, help_text='Should form submissions automatically copy data to the paired BEAM property or tax lot?', verbose_name='Automatically Copy to Beam'),
+        ),
+        migrations.AddField(
+            model_name='formtype',
+            name='auto_pair',
+            field=models.BooleanField(default=False, help_text='Should form submissions automatically attempt to pair with the BEAM inventory?', verbose_name='Automatically Pair'),
+        ),
+        migrations.AddConstraint(
+            model_name='formtype',
+            constraint=models.CheckConstraint(check=models.Q(('auto_copy', False), models.Q(('auto_copy', True), ('auto_pair', True)), _connector='OR'), name='form_auto_pair_if_auto_copy'),
+        ),
     ]

@@ -407,11 +407,15 @@ class FormType(models.Model):
                                     help_text=_('Should this form allow prepopulation from a building ID?'))
     pull_cycle = models.ForeignKey(Cycle, on_delete=models.SET_NULL, null=True, blank=True, related_name='pull_forms',
                                     help_text=_('BEAM Cycle to pull property data from. Required if prepopulate is checked or using derived column fields.'))
+    auto_pair = models.BooleanField(_('Automatically Pair'), blank=False, default=False,
+                                    help_text=_('Should form submissions automatically attempt to pair with the BEAM inventory?'))
+    auto_copy = models.BooleanField(_('Automatically Copy to Beam'), blank=False, default=False,
+                                    help_text=_('Should form submissions automatically copy data to the paired BEAM property or tax lot?'))
     push_cycle = models.ForeignKey(Cycle, on_delete=models.SET_NULL, null=True, blank=True, related_name='push_forms',
                                     help_text=_('BEAM Cycle to push property data to. Required if automatically copying data or creating portfolios.'))
     view_only = models.BooleanField(_('View-Only Form?'), blank=False, default=False,
                                     help_text=_('Should this form not allow any submissions? Removes the submit button from the form.'))
-    
+
     # Add Preset Form Fields to the Database, avoiding having to run a PSQL command in another terminal window.
     # This will happen automatically upon FormType Creation
 
@@ -430,6 +434,16 @@ class FormType(models.Model):
                     | Q(multi_pair=False, prepopulate=True)
                     | Q(multi_pair=False, prepopulate=False)
                 )
+            )
+        ]
+
+        constraints=[
+            models.CheckConstraint(
+                check=(
+                    Q(auto_copy=False)
+                    | Q(auto_copy=True, auto_pair=True)
+                ),
+                name='form_auto_pair_if_auto_copy'
             )
         ]
 
