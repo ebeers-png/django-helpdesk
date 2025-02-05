@@ -7,6 +7,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ('helpdesk', '0113_building_id_from_list'),
+        ('seed', '0263_portfolios_and_aggregation')
     ]
 
     operations = [

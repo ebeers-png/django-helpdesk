@@ -2,7 +2,7 @@
 
 from django.db import migrations, models
 import django.db.models.deletion
-
+from django.conf import settings
 
 class Migration(migrations.Migration):
 
@@ -35,6 +35,11 @@ class Migration(migrations.Migration):
             model_name='formtype',
             name='auto_create_portfolio',
             field=models.BooleanField(default=False, help_text='Should form submissions automatically create BEAM portfolio from the paired properties?', verbose_name='Automatically Create Portfolio?'),
+        ),
+        migrations.AddField(
+            model_name='formtype',
+            name='authorizing_user',
+            field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, to=settings.AUTH_USER_MODEL),
         ),
         migrations.AddField(
             model_name='customfield',

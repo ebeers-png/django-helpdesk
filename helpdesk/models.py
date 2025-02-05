@@ -414,6 +414,7 @@ class FormType(models.Model):
                                                 'If multi-property pairing is checked, property fields will be copied to all paired properties.'))
     auto_create_portfolio = models.BooleanField(_('Automatically Create Portfolio?'), blank=False, default=False,
                                                 help_text=(_('Should form submissions automatically create BEAM portfolio from the paired properties?')))
+    authorizing_user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, blank=True, null=True)
     push_cycle = models.ForeignKey(Cycle, on_delete=models.SET_NULL, null=True, blank=True, related_name='push_forms',
                                     help_text=_('BEAM Cycle to push property data to. Required if automatically copying data or creating portfolios.'))
     view_only = models.BooleanField(_('View-Only Form?'), blank=False, default=False,
