@@ -403,7 +403,7 @@ def create_form(request):
             formtype.prepopulate = form.cleaned_data['prepopulate']
             formtype.pull_cycle = form.cleaned_data['pull_cycle']
             formtype.auto_pair = form.cleaned_data['auto_pair']
-            formtype.auto_pair = form.cleaned_data['auto_copy']
+            formtype.auto_copy = form.cleaned_data['auto_copy']
             formtype.view_only = form.cleaned_data['view_only']
             formtype.save()
 
@@ -501,7 +501,7 @@ def edit_form(request, pk):
                     formtype.prepopulate = form.cleaned_data['prepopulate']
                     formtype.pull_cycle = form.cleaned_data['pull_cycle']
                     formtype.auto_pair = form.cleaned_data['auto_pair']
-                    formtype.auto_pair = form.cleaned_data['auto_copy']
+                    formtype.auto_copy = form.cleaned_data['auto_copy']
                     formtype.view_only = form.cleaned_data['view_only']
                     formtype.save()
 
