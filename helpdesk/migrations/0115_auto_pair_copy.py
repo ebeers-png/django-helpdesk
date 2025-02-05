@@ -7,7 +7,6 @@ import django.db.models.deletion
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('seed', '0273_create_portfolio_columns'),
         ('helpdesk', '0114_ticket_beam_portfolio'),
     ]
 
