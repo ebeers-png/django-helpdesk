@@ -22,7 +22,7 @@ from django.contrib.auth import get_user_model
 from django.utils import timezone
 from django.shortcuts import get_object_or_404
 
-from helpdesk.lib import safe_template_context, process_attachments, pair_properties_by_form
+from helpdesk.lib import _update_building_data, safe_template_context, process_attachments, pair_properties_by_form
 from helpdesk.models import (DependsOn, Ticket, Queue, FollowUp, IgnoreEmail, TicketCC,
                              CustomField, TicketDependency, UserSettings, KBItem, Tag,
                              FormType, KBCategory, KBIAttachment, is_extra_data, PreSetReply, EmailTemplate, clean_html)
@@ -31,7 +31,7 @@ from helpdesk.email import create_ticket_cc
 from helpdesk.decorators import list_of_helpdesk_staff
 import re
 
-from seed.models import Column, Cycle
+from seed.models import Column, Cycle, Portfolio, PortfolioState
 from seed.utils.storage import get_media_url
 
 logger = logging.getLogger(__name__)
@@ -649,7 +649,7 @@ class EditFormTypeForm(forms.ModelForm):
 
     class Meta:
         model = FormType
-        exclude = ('organization', 'created', 'updated',)
+        exclude = ('organization', 'created', 'updated', 'authorizing_user')
 
     def __init__(self, *args, **kwargs):
         """
@@ -1083,15 +1083,67 @@ class AbstractTicketForm(CustomFieldMixin, forms.Form):
             building_id=self.cleaned_data.get('building_id', None),
             extra_data=extra_data
         )
-
-        # TODO: auto pair / copy
+        ticket.save()
+        
         if ticket_form.auto_pair:
             pair_properties_by_form(None, ticket_form, [ticket])
-            paired = ticket.beam_property.count() or ticket.beam_taxlot.count() or ticket.beam_portfolio.count()
+            
+            # TODO: validate user (e.g. check ticket email address on property state)
+            
+            properties_paired = ticket.beam_property.count()
+            taxlots_paired = ticket.beam_taxlot.count()
+            portfolios_paired = ticket.beam_portfolio.count()
+            
+            if properties_paired or taxlots_paired or portfolios_paired:
+                cycle = ticket_form.push_cycle
+                
+                # Auto-Create Portfolios
+                if properties_paired and portfolios_paired <= 1 and ticket_form.auto_create_portfolio:
+                    portfolio = ticket.beam_portfolio.first()
+                    
+                    # Use existing portfolio (if there is exactly 1)
+                    if portfolio:
+                        portfolio_view, created = portfolio.views.get_or_create(
+                            cycle=cycle, 
+                            defaults={'state': PortfolioState.objects.create()}
+                        )
+                        
+                    # Create new portfolio
+                    else:
+                        portfolio = Portfolio.objects.create(organization=ticket_form.organization)
+                        portfolio_state = PortfolioState.objects.create()
+                        portfolio_view = portfolio.views.create(cycle=cycle, state=portfolio_state)
+                        ticket.beam_portfolio.add(portfolio)
+                    
+                    for property in ticket.beam_property.all():
+                        property_view = property.views.filter(cycle=cycle).first()
+                        if property_view:
+                            portfolio_view.properties.get_or_create(property_view=property_view)
+            
+                # Auto-copy ticket data
+                if ticket_form.auto_copy:
+                    user = ticket_form.authorizing_user
+                    fields = ticket_form.customfield_set.filter(auto_copy=True, column__isnull=False).select_related("column")
+                    
+                    inventory_sets = {
+                        'PropertyState': ticket.beam_property,
+                        'TaxLotState': ticket.beam_taxlot,
+                        # 'PortfolioState': ticket.beam_portfolio
+                    }
+                    
+                    for inventory_type, inventory_set in inventory_sets.items():
+                        for inventory_item in inventory_set.all():
+                            inventory_view = inventory_item.views.filter(cycle=cycle).first()
+                            inventory_fields = fields.filter(column__table_name=inventory_type)
+                            if inventory_view:
+                                _update_building_data(user, inventory_type, cycle.id, inventory_view.id, ticket.id, inventory_fields)
 
-            if paired and ticket_form.auto_copy:
-                pass
-                # update_building_data(None, ticket.id)
+                    # Portfolio data
+                    for portfolio in ticket.beam_portfolio.all():
+                        portfolio_view = portfolio.views.filter(cycle=cycle).first()
+                        if portfolio_view:
+                            pass
+                            # _update_building_data(user, 'PortfolioState', cycle.id, portfolio_view.id, ticket.id, fields)
 
         return ticket, queue
 

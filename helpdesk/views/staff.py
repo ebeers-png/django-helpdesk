@@ -68,7 +68,7 @@ from helpdesk.models import (
 from helpdesk import settings as helpdesk_settings
 import helpdesk.views.abstract_views as abstract_views
 from helpdesk.views.permissions import MustBeStaffMixin
-from ..lib import format_time_spent
+from ..lib import _update_building_data, format_time_spent
 
 from rest_framework import status
 from rest_framework.decorators import api_view
@@ -503,6 +503,7 @@ def edit_form(request, pk):
                     formtype.auto_pair = form.cleaned_data['auto_pair']
                     formtype.auto_copy = form.cleaned_data['auto_copy']
                     formtype.view_only = form.cleaned_data['view_only']
+                    formtype.authorizing_user = request.user
                     formtype.save()
 
                     if formset.is_valid():
@@ -3554,52 +3555,17 @@ def update_building_data(request, ticket_id):
     from seed.views.v3.taxlots import TaxlotViewSet
 
     if request.is_ajax and request.method == "POST":
-        ticket = get_object_or_404(Ticket, id=ticket_id)
-        org = ticket.ticket_form.organization
         # get the form data
+        user = request.user
         inventory_type = request.POST.get('inventory_type', '')
         cycle_id = request.POST.get('cycle_id', '')
         view_id = request.POST.get('view_id', '')
         fields = request.POST.getlist('fields[]', [])
+        
+        form_fields = get_object_or_404(Ticket, id=ticket_id).ticket_form.customfield_set.filter(field_name__in=fields, column__isnull=False).select_related("column")
 
-        cycle = get_object_or_404(Cycle, organization=org, id=cycle_id)
-        if inventory_type == 'PropertyState':
-            view = get_object_or_404(PropertyView, id=view_id)
-        else:
-            view = get_object_or_404(TaxLotView, id=view_id)
-        form_fields = ticket.ticket_form.customfield_set.filter(field_name__in=fields, column__isnull=False).select_related("column")
-        update_data, extra_data, data = {}, {}, {}
-        for f in form_fields:
-            if f.field_name in ticket.extra_data \
-                    and ticket.extra_data[f.field_name] is not None and ticket.extra_data[f.field_name] != '':
-                value = ticket.extra_data[f.field_name]
-            elif hasattr(ticket, f.field_name) \
-                    and getattr(ticket, f.field_name, None) is not None and getattr(ticket, f.field_name, None) != '':
-                value = getattr(ticket, f.field_name, None)
-            else:
-                value = ''
-            if f.column.is_extra_data:
-                extra_data[f.column.column_name] = value
-            else:
-                data[f.column.column_name] = value
-
-        # Create request to send to BEAM
-        update_data = {'state': data}
-        update_data['state']['extra_data'] = extra_data
-        update_request = HttpRequest()
-        update_request.method = 'PUT'
-        update_request.query_params = QueryDict('organization_id=' + str(org.id))
-        update_request.user = request.user
-        update_request.data = update_data
-        update_request.parser_context = {}
-
-        if inventory_type == 'PropertyState':
-            viewset = PropertyViewSet()
-        else:
-            viewset = TaxlotViewSet()
-        viewset.request = update_request
-        response = viewset.update(update_request, pk=view.id)
-        return response
+        return _update_building_data(user, inventory_type, cycle_id, view_id, ticket_id, form_fields)
+        
 
 def load_create_portfolio(request, ticket_id):
     """

@@ -10,8 +10,10 @@ import logging
 from mimetypes import guess_type
 
 from django.conf import settings
+from django.http import HttpRequest, QueryDict
+from django.shortcuts import get_object_or_404
 from django.utils.encoding import smart_text
-from helpdesk.models import FollowUpAttachment, FormType, is_extra_data
+from helpdesk.models import FollowUpAttachment, FormType, is_extra_data, Ticket
 from seed.serializers.properties import PropertyStateSerializer
 from seed.serializers.taxlots import TaxLotStateSerializer
 from seed.models import (
@@ -19,6 +21,8 @@ from seed.models import (
     PropertyView, TaxLotView, PortfolioView, 
     Property, TaxLot, Portfolio, Cycle
 )
+from seed.views.v3.properties import PropertyViewSet
+from seed.views.v3.taxlots import TaxlotViewSet
 
 logger = logging.getLogger(__name__)
 
@@ -315,3 +319,51 @@ def pair_properties_by_form(request, form, tickets):
             if (not (lookups['PropertyState'] and not property_lookup)) and \
                     (not (lookups['TaxLotState'] and not taxlot_lookup)):
                 break
+            
+def _update_building_data(user, inventory_type, cycle_id, view_id, ticket_id, fields):
+    ticket = get_object_or_404(Ticket, id=ticket_id)
+    org = ticket.ticket_form.organization
+    cycle = get_object_or_404(Cycle, organization=org, id=cycle_id)
+    
+    if inventory_type == 'PropertyState':
+        view = get_object_or_404(PropertyView, id=view_id)
+    elif inventory_type == 'TaxLotState':
+        view = get_object_or_404(TaxLotView, id=view_id)
+    else:
+        view = get_object_or_404(PortfolioView, id=view_id)
+    
+    update_data, extra_data, data = {}, {}, {}
+    for f in fields:
+        if f.field_name in ticket.extra_data \
+                and ticket.extra_data[f.field_name] is not None and ticket.extra_data[f.field_name] != '':
+            value = ticket.extra_data[f.field_name]
+        elif hasattr(ticket, f.field_name) \
+                and getattr(ticket, f.field_name, None) is not None and getattr(ticket, f.field_name, None) != '':
+            value = getattr(ticket, f.field_name, None)
+        else:
+            value = ''
+        if f.column.is_extra_data:
+            extra_data[f.column.column_name] = value
+        else:
+            data[f.column.column_name] = value
+
+    # Create request to send to BEAM
+    update_data = {'state': data}
+    update_data['state']['extra_data'] = extra_data
+    update_request = HttpRequest()
+    update_request.method = 'PUT'
+    update_request.query_params = QueryDict('organization_id=' + str(org.id))
+    update_request.user = user
+    update_request.data = update_data
+    update_request.parser_context = {}
+
+    if inventory_type == 'PropertyState':
+        viewset = PropertyViewSet()
+    elif inventory_type == 'TaxLotState':
+        viewset = TaxlotViewSet()
+    # else:
+    #     viewset = PortfolioViewSet()        
+
+    viewset.request = update_request
+    response = viewset.update(update_request, pk=view.id)
+    return response
