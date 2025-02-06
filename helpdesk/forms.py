@@ -1128,7 +1128,7 @@ class AbstractTicketForm(CustomFieldMixin, forms.Form):
                     inventory_sets = {
                         'PropertyState': ticket.beam_property,
                         'TaxLotState': ticket.beam_taxlot,
-                        # 'PortfolioState': ticket.beam_portfolio
+                        'PortfolioState': ticket.beam_portfolio
                     }
                     
                     for inventory_type, inventory_set in inventory_sets.items():
@@ -1137,13 +1137,6 @@ class AbstractTicketForm(CustomFieldMixin, forms.Form):
                             inventory_fields = fields.filter(column__table_name=inventory_type)
                             if inventory_view:
                                 _update_building_data(user, inventory_type, cycle.id, inventory_view.id, ticket.id, inventory_fields)
-
-                    # Portfolio data
-                    for portfolio in ticket.beam_portfolio.all():
-                        portfolio_view = portfolio.views.filter(cycle=cycle).first()
-                        if portfolio_view:
-                            pass
-                            # _update_building_data(user, 'PortfolioState', cycle.id, portfolio_view.id, ticket.id, fields)
 
         return ticket, queue
 
