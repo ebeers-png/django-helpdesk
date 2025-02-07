@@ -373,6 +373,8 @@ def create_form(request):
                 'pull_cycle': formtype.pull_cycle,
                 'auto_pair': formtype.auto_pair,
                 'auto_copy': formtype.auto_copy,
+                'auto_create_portfolio': formtype.auto_create_portfolio,
+                'push_cycle': formtype.push_cycle,
                 'view_only': formtype.view_only
             },
             initial_customfields = CustomField.objects.filter(ticket_form=formtype),
@@ -404,7 +406,10 @@ def create_form(request):
             formtype.pull_cycle = form.cleaned_data['pull_cycle']
             formtype.auto_pair = form.cleaned_data['auto_pair']
             formtype.auto_copy = form.cleaned_data['auto_copy']
+            formtype.auto_create_portfolio = form.cleaned_data['auto_create_portfolio']
+            formtype.push_cycle = form.cleaned_data['push_cycle']
             formtype.view_only = form.cleaned_data['view_only']
+            formtype.authorizing_user = request.user
             formtype.save()
 
             if formset.is_valid():
@@ -431,6 +436,7 @@ def create_form(request):
                     customfield.public = cf['public']
                     customfield.column = cf['column']
                     customfield.lookup = cf['lookup']
+                    customfield.auto_copy = cf['auto_copy']
                     customfield.read_only = cf['read_only']
                     if not customfield.created: customfield.created = datetime.now()
                     customfield.modified = datetime.now()
@@ -468,6 +474,8 @@ def edit_form(request, pk):
                 'pull_cycle': formtype.pull_cycle,
                 'auto_pair': formtype.auto_pair,
                 'auto_copy': formtype.auto_copy,
+                'auto_create_portfolio': formtype.auto_create_portfolio,
+                'push_cycle': formtype.push_cycle,
                 'view_only': formtype.view_only
             },
             initial_customfields=CustomField.objects.filter(ticket_form=formtype).prefetch_related('parent_fields'),
@@ -502,6 +510,8 @@ def edit_form(request, pk):
                     formtype.pull_cycle = form.cleaned_data['pull_cycle']
                     formtype.auto_pair = form.cleaned_data['auto_pair']
                     formtype.auto_copy = form.cleaned_data['auto_copy']
+                    formtype.auto_create_portfolio = form.cleaned_data['auto_create_portfolio']
+                    formtype.push_cycle = form.cleaned_data['push_cycle']
                     formtype.view_only = form.cleaned_data['view_only']
                     formtype.authorizing_user = request.user
                     formtype.save()
@@ -531,6 +541,7 @@ def edit_form(request, pk):
                             customfield.public = cf['public']
                             customfield.column = cf['column']
                             customfield.lookup = cf['lookup']
+                            customfield.auto_copy = cf['auto_copy']
                             customfield.read_only = cf['read_only']
                             if not customfield.created: customfield.created = datetime.now()
                             customfield.modified = datetime.now()
@@ -1054,7 +1065,8 @@ def view_ticket(request, ticket_id):
     else:
         taxlot_display_query = 'state__address_line_1'
 
-    portfolio_display_query = 'portfolio__name'
+    # TODO: add a organization setting for portfolio display field + change this query
+    portfolio_display_query = 'portfolio__id'
 
     properties = list(
         PropertyView.objects.filter(property_id__in=ticket.beam_property.all().values_list('id', flat=True))

@@ -21,6 +21,7 @@ from seed.models import (
     PropertyView, TaxLotView, PortfolioView, 
     Property, TaxLot, Portfolio, Cycle
 )
+from seed.views.v3.portfolios import PortfolioViewSet
 from seed.views.v3.properties import PropertyViewSet
 from seed.views.v3.taxlots import TaxlotViewSet
 
@@ -309,7 +310,8 @@ def pair_properties_by_form(request, form, tickets):
                         {'portfolioview__properties__property_view__property__in': property_lookup},
                         PortfolioState, PortfolioView, c, Portfolio
                     )
-                    ticket.beam_portfolio.add(*portfolio_lookup)
+                    if portfolio_lookup:
+                        ticket.beam_portfolio.add(*portfolio_lookup)
 
             if not taxlot_lookup and lookups['TaxLotState'] and TaxLotView.objects.filter(cycle=c).exists():
                 taxlot_lookup = lookup(lookups['TaxLotState'], TaxLotState, TaxLotView, c, TaxLot)
@@ -357,13 +359,16 @@ def _update_building_data(user, inventory_type, cycle_id, view_id, ticket_id, fi
     update_request.data = update_data
     update_request.parser_context = {}
 
+    pk = view.id
     if inventory_type == 'PropertyState':
         viewset = PropertyViewSet()
     elif inventory_type == 'TaxLotState':
         viewset = TaxlotViewSet()
-    # else:
-    #     viewset = PortfolioViewSet()        
+    else:
+        viewset = PortfolioViewSet()        
+        update_request.data['cycle_id'] = cycle_id
+        pk = view.portfolio.id
 
     viewset.request = update_request
-    response = viewset.update(update_request, pk=view.id)
+    response = viewset.update(update_request, pk=pk)
     return response

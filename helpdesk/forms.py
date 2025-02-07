@@ -701,6 +701,7 @@ class EditFormTypeForm(forms.ModelForm):
                     'public': cf.public,
                     'column': cf.column,
                     'lookup': cf.lookup,
+                    'auto_copy': cf.auto_copy,
                     'read_only': cf.read_only
                 })
                 if cf.parent_fields.count():
@@ -1093,7 +1094,7 @@ class AbstractTicketForm(CustomFieldMixin, forms.Form):
             properties_paired = ticket.beam_property.count()
             taxlots_paired = ticket.beam_taxlot.count()
             portfolios_paired = ticket.beam_portfolio.count()
-            
+
             if properties_paired or taxlots_paired or portfolios_paired:
                 cycle = ticket_form.push_cycle
                 
@@ -1135,7 +1136,7 @@ class AbstractTicketForm(CustomFieldMixin, forms.Form):
                         for inventory_item in inventory_set.all():
                             inventory_view = inventory_item.views.filter(cycle=cycle).first()
                             inventory_fields = fields.filter(column__table_name=inventory_type)
-                            if inventory_view:
+                            if inventory_view and inventory_fields:
                                 _update_building_data(user, inventory_type, cycle.id, inventory_view.id, ticket.id, inventory_fields)
 
         return ticket, queue
