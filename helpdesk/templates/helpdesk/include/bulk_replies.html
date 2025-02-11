@@ -1,0 +1,31 @@
+{% load i18n humanize %}
+
+<div class="modal fade" id="bulkRepliesModal" tabindex="-1" role="dialog" aria-labelledby="bulkRepliesModalLabel" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="bulkRepliesModalLabel">Bulk Replies</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <fieldset>
+                    <dl>
+                        {% if preset_replies %}
+                        <dd><label for='id_preset'><b>{% trans "Select a Preset Reply" %}</b></label>
+                        <select name='preset' id='id_preset' class='form-control'><option value=''>------</option>{% for preset in preset_replies %}<option value='{{ preset.id }}'>{{ preset.name }}</option>{% endfor %}</select><br/>
+                        </dd>
+                        {% endif %}
+                        <dd><label for='id_public'><input type='checkbox' id='id_public' name='public' />&nbsp; <b>{% trans 'Make this update public?' %}</b></dd>
+                        <dd class='form_help_text'>{% trans "If public, an email will be sent to the submitter, primary contact, copied nonusers, and any other email addresses listed on the form.<br>If private, an email will only be sent to the assigned staff owner and internal users. Use this to leave internal comments, questions, and flags. Responses will <i>not</i> be sent to the original sender. " %}</dd>
+                    </dl>
+                </fieldset>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                <button type="button"  class="btn btn-danger" onclick="onBulkRepliesConfirm()">Confirm</button>
+            </div>
+        </div>
+    </div>
+</div>
