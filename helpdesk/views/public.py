@@ -23,14 +23,14 @@ from django.views.decorators.clickjacking import xframe_options_exempt
 from django.views.decorators.csrf import csrf_exempt
 from django.views.generic.base import TemplateView
 from django.views.generic.edit import FormView
-from django.db.models import Q
+from django.db.models import Q, OuterRef, Subquery
 
 from helpdesk import settings as helpdesk_settings
 from helpdesk.decorators import protect_view, is_helpdesk_staff
 import helpdesk.views.staff as staff
 import helpdesk.views.abstract_views as abstract_views
 from helpdesk.lib import text_is_spam
-from helpdesk.models import Ticket, UserSettings, CustomField, FormType, TicketCC, is_unlisted
+from helpdesk.models import Ticket, UserSettings, CustomField, FormType, TicketCC, is_unlisted, FollowUp
 from helpdesk.user import huser_from_request
 
 logger = logging.getLogger(__name__)
@@ -62,26 +62,59 @@ def create_ticket(request, form_id=None,  *args, **kwargs, ):
         else:
             return HttpResponseRedirect(reverse('helpdesk:home'))
 
+
 def ticket_list_owner(request):
-    ticket_org = request.user.default_organization.helpdesk_organization.name
-    submitter_email = request.user.email
-    open_tickets = Ticket.objects.exclude(Q(status=Ticket.DUPLICATE_STATUS) | Q(status=Ticket.RESOLVED_STATUS) | Q(status=Ticket.CLOSED_STATUS)).filter(submitter_email__iexact=submitter_email)
-    resolved_tickets = Ticket.objects.filter(Q(status=Ticket.DUPLICATE_STATUS) | Q(status=Ticket.RESOLVED_STATUS) | Q(status=Ticket.CLOSED_STATUS), submitter_email__iexact=submitter_email)
-    cc_tickets = TicketCC.objects.filter(user=request.user)
+    email = request.user.email
+    org_id = request.user.default_organization.helpdesk_organization.id
+    search_query = None
+    search_results = None
+
+    # find email fields and use for lookups
+    email_fields = CustomField.objects.filter(
+        ticket_form__organization_id=org_id,
+        data_type='email',
+        notifications=True,
+    ).order_by('field_name').distinct('field_name').values_list('field_name', flat=True)
+    cc_q_list = Q()
+    for field in email_fields:
+        cc_q_list |= Q(**{f'extra_data__{field}__iexact': email})
+
+    # create querysets
+    open_tickets = (Ticket.objects.filter(ticket_form__organization_id=org_id)
+                    .exclude(Q(status=Ticket.DUPLICATE_STATUS) | Q(status=Ticket.RESOLVED_STATUS) | Q(status=Ticket.CLOSED_STATUS)))
+    submitted_tickets = open_tickets.filter(submitter_email__iexact=email)
+    cc_tickets = (open_tickets
+                  .exclude(pk__in=submitted_tickets.values_list('pk', flat=True))
+                  .filter(Q(contact_email__iexact=email) | Q(ticketcc__email__iexact=email) | Q(ticketcc__user=request.user) | cc_q_list)
+                  )
+    resolved_tickets = (Ticket.objects
+                        .filter(Q(status=Ticket.DUPLICATE_STATUS) | Q(status=Ticket.RESOLVED_STATUS) | Q(status=Ticket.CLOSED_STATUS), ticket_form__organization_id=org_id)
+                        .filter(Q(ticketcc__email__iexact=email) | Q(ticketcc__user=request.user) | Q(submitter_email__iexact=email) | Q(contact_email__iexact=email) | cc_q_list))
+
+    # annotate tickets with "last reply"
+    followup_subquery = FollowUp.objects.filter(ticket_id=OuterRef("id")).reverse().values('date')
+    submitted_tickets = submitted_tickets.annotate(last_reply=Subquery(followup_subquery[:1]))
+    cc_tickets = cc_tickets.annotate(last_reply=Subquery(followup_subquery[:1]))
+    resolved_tickets = resolved_tickets.annotate(last_reply=Subquery(followup_subquery[:1]))
 
     if request.GET and 'q' in request.GET:
         search_query = request.GET.get('q')
-        # Todo: search in followups
-        open_tickets = open_tickets.filter(Q(title__icontains=search_query) | Q(description__icontains=search_query))
-        resolved_tickets = resolved_tickets.filter(Q(title__icontains=search_query) | Q(description__icontains=search_query))
-        cc_tickets = cc_tickets.filter(Q(ticket__title__icontains=search_query) | Q(ticket__description__icontains=search_query))
-    
+        search_results = (Ticket.objects
+            .filter(ticket_form__organization_id=org_id)
+            .filter(Q(ticketcc__email__iexact=email) | Q(ticketcc__user=request.user) | Q(submitter_email__iexact=email) | Q(contact_email__iexact=email) | cc_q_list)
+            .filter(Q(title__icontains=search_query) | Q(description__icontains=search_query)))
+        search_results = search_results.annotate(last_reply=Subquery(followup_subquery[:1]))
+
     return render(request, 'helpdesk/ticket_list_owner.html', {
-        'submitted_tickets': open_tickets,
+        'search_query': search_query,
+        'search_results': search_results,
+        'submitted_tickets': submitted_tickets,
         'completed_tickets': resolved_tickets,
-        'cc_tickets': cc_tickets
+        'cc_tickets': cc_tickets,
     })
 
+
+"""
 def ticket_detail(request, ticket_id):
     ticket_org = request.user.default_organization.helpdesk_organization.name
     user_email = request.user.email
@@ -127,6 +160,8 @@ def ticket_detail(request, ticket_id):
         can_update = cc_user.can_update
     elif user_email == ticket.submitter_email:
         can_update = True
+    else:
+        can_update = True
 
     extra_display = CustomField.objects.filter(ticket_form=ticket.ticket_form).values()
     extra_data = []
@@ -145,6 +180,8 @@ def ticket_detail(request, ticket_id):
         'can_update': can_update,
         'debug': settings.DEBUG,
     })
+"""
+
 
 class BaseCreateTicketView(abstract_views.AbstractCreateTicketMixin, FormView):
     form_id = None
@@ -403,7 +440,6 @@ def view_ticket(request):
             else:
                 field['value'] = getattr(ticket, field['field_name'], None)
             extra_data.append(field)
-    breakpoint()
     return render(request, 'helpdesk/public_view_ticket.html', {
         'key': key,
         'mail': email,

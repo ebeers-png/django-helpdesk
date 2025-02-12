@@ -1,10 +1,10 @@
 {% extends "helpdesk/base.html" %}{% load i18n %}
 
-{% block helpdesk_title %}{% trans "Helpdesk Dashboard" %}{% endblock %}
+{% block helpdesk_title %}{% trans "My Tickets" %}{% endblock %}
 
 {% block helpdesk_breadcrumb %}
 <li class="breadcrumb-item">
-    <a href="#">Dashboard</a>
+    <a href="#">My Tickets</a>
 </li>
 <li class="breadcrumb-item active">{% trans "Overview" %}</li>
 {% endblock %}
@@ -12,38 +12,53 @@
 {% block helpdesk_body %}
 
 <div class="row">
-    <div class="col-sm-12">
+    <div class="col-lg-9">
         <div class="alert alert-warning">
-            <p>{% trans "Welcome to your Helpdesk Dashboard! From here you can quickly see tickets submitted by you, tickets you are CC on, and those tickets that are completed." %}</p>
+            <p>{% trans "Welcome to your tickets! Here you can view tickets submitted by you, tickets you are following, and your completed tickets." %}</p>
         </div>
+    </div>
+
+    <div class="col-lg-3">
+        <form id='searchform' method='get' action="{% url 'helpdesk:ticket_list_owner' %}">
+            <div class="input-group">
+                <input type="text" class="form-control" name='q' placeholder='{% trans "Search tickets..." %}' id='search_query'
+                       {% if search_query %} value="{{search_query}}" {% endif %}
+                       aria-label="Search" aria-describedby="basic-addon2">
+                <div class="input-group-append">
+                    <button class="btn btn-primary rounded-right" type="submit">
+                        <i class="fas fa-search"></i> {% trans 'Go' %}
+                    </button>
+                </div>
+                {% if search_query %}
+                <a href="{% url 'helpdesk:ticket_list_owner' %}" class="btn btn-primary" style="margin-left:10px;">
+                    {% trans 'Clear search' %}
+                </a>
+                {% endif %}
+            </div>
+        </form>
     </div>
 </div>
-
-<form class="d-none d-md-inline-block form-inline ml-auto mr-0 mr-md-3 my-2 mb-3" id='searchform' method='get' action="{% url 'helpdesk:ticket_list_owner' %}">
-    <div class="input-group">
-        <input type="text" class="form-control" name='q' size='15' placeholder='{% trans "Search..." %}' id='search_query' title='{% trans "Enter a keyword, or a ticket number to jump straight to that ticket." %}' aria-label="Search" aria-describedby="basic-addon2">
-        <div class="input-group-append">
-        <button class="btn btn-primary" type="submit">
-            <i class="fas fa-search"></i> {% trans 'Go' %}
-        </button>
-        </div>
-    </div>
-</form>
-
-
-{% trans "Your Submitted Tickets" as ticket_list_caption %}
+{% if not search_query %}
+{% trans "My Submitted Tickets" as ticket_list_caption %}
 {% trans "You haven't submitted any tickets." as no_submitted_tickets %}
 {% trans "ut_page" as page_var %}
 {% include 'helpdesk/include/tickets_owner.html' with ticket_list=submitted_tickets ticket_list_empty_message=no_submitted_tickets page_var=page_var %}
 
-{% trans "Tickets You're Following" as ticket_list_caption %}
-{% trans "You haven't followed any tickets." as no_following_tickets %}
+{% trans "Tickets I'm Following" as ticket_list_caption %}
+{% trans "You aren't following any tickets." as no_following_tickets %}
 {% trans "uat_page" as page_var %}
 {% include 'helpdesk/include/tickets_owner.html' with ticket_list=cc_tickets ticket_list_empty_message=no_following_tickets page_var=page_var %}
 
-{% trans "Your Completed Tickets" as ticket_list_caption %}
+{% trans "Completed Tickets" as ticket_list_caption %}
 {% trans "You have no completed tickets." as no_completed_tickets %}
 {% trans "utcr_page" as page_var %}
 {% include 'helpdesk/include/tickets_owner.html' with ticket_list=completed_tickets ticket_list_empty_message=no_completed_tickets page_var=page_var %}
+
+{% else %}
+{% trans "Search Results" as ticket_list_caption %}
+{% trans "No tickets were found." as no_tickets %}
+{% trans "ut_page" as page_var %}
+{% include 'helpdesk/include/tickets_owner.html' with ticket_list=search_results ticket_list_empty_message=no_tickets page_var=page_var %}
+{% endif %}
 
 {% endblock %}
