@@ -1,0 +1,174 @@
+{% extends "helpdesk/public_base.html" %}{% load i18n humanize helpdesk_staff %}
+{% load static %}
+{% load ticket_to_link %}
+{% block helpdesk_title %}{% trans "View a Ticket" %}{% endblock %}
+
+{% block helpdesk_breadcrumb %}
+{% if user|is_helpdesk_staff %}
+<li class="breadcrumb-item">
+    <a href="{% url 'helpdesk:list' %}">{% trans "Tickets" %}</a>
+</li>
+<li class="breadcrumb-item active">
+    {{ ticket.queue.slug }}-{{ ticket.id }}
+</li>
+{% else %}
+<li class="breadcrumb-item">
+    <a href="{% url 'helpdesk:home' %}{{ user_info.url }}">{% trans "Knowledgebase" %}</a>
+</li>
+<li class="breadcrumb-item active">{% trans "Overview" %}</li>
+{% endif %}
+{% endblock %}
+
+
+{% block helpdesk_body %}
+
+<table class="table table-hover table-bordered table-striped">
+    <thead>
+        <tr>
+            <th colspan='2'>
+                <h3>Ticket details for <span class="byline text-info">{{ ticket.ticket }}{% if ticket.title %} {{ ticket.title }}{% endif %}</span> {% if ticket.get_status == 'Replied' %}(Open){% else %}({{ ticket.get_status }}){% endif %}</h3>
+                {% blocktrans with ticket.queue as queue and ticket.queue.organization.name as org %}
+                {{ org }}'s Queue: {{ queue }}{% endblocktrans %}
+                {% if ticket.property_milestones.count > 0 %}
+                <br>
+                <button type="button" id="milestoneButton" class="btn btn-primary btn-sm dropdown-toggle" data-toggle="dropdown"><i class="fas fa-road"></i> {% trans "View Milestone(s)" %}</button>
+                <div class="dropdown-menu" aria-labelledby="milestoneButton">
+                    {% for property_milestone in ticket.property_milestones.all %}
+                    <a class="dropdown-item" href="{{ property_milestone.property_view_url }}" target="_blank" rel="noopener noreferrer">{{ property_milestone.milestone.name }}</a>
+                    {% endfor %}
+                </div>
+                {% endif %}
+            </th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <th>{% trans "Submitted On" %}</th>
+            <td>{{ ticket.created|date:"DATETIME_FORMAT" }} ({{ ticket.created|naturaltime }})</td>
+        </tr>
+
+        {% if ticket.due_date %}
+        <tr>
+            <th>{% trans "Due On" %}</th>
+            <td>{{ ticket.due_date|date:"DATETIME_FORMAT" }} ({{ ticket.due_date|naturaltime }})</td>
+        </tr>
+        {% endif %}
+
+        <tr>
+            <th>{% trans "Submitter E-Mail" %}</th>
+            <td>{{ ticket.submitter_email }}</td>
+        </tr>
+
+        <tr>
+            <th>{% trans "Priority" %}</th>
+            <td>{{ ticket.get_priority_display }}</td>
+        </tr>
+
+        {% for field in extra_data %}
+        <tr>
+            <th>{{ field.label }}</th>
+            <td>{% spaceless %}{% if "url" == field.data_type %}<a href='{{ field.value }}'>{{ field.value }}</a>
+                {% elif "datetime" == field.data_type %}{{ field.value|date:"DATETIME_FORMAT" }} ({{ field.value|naturaltime }})
+                {% elif "date" == field.data_type %}{{ field.value|date:"DATETIME_FORMAT" }} ({{ field.value|naturaltime }})
+                {% elif "time" == field.data_type %}{{ field.value|date:"DATETIME_FORMAT" }} ({{ field.value|naturaltime }})
+                {% else %}{{ field.value|default:"" }}
+                {% endif %}{% endspaceless %}</td>
+        </tr>
+        {% endfor %}
+
+        {% if tags_enabled %}
+        <tr>
+            <th>{% trans "Tags" %}</th>
+            <td>{{ ticket.tags }}</td>
+        </tr>
+        {% endif %}
+
+        <tr><th colspan='2'>{% trans "Description" %}</th></tr>
+        <tr><td colspan='2'>{% if ticket.description %}{{ ticket.get_markdown|num_to_link }}{% else %}No description given.{% endif %}</td></tr>
+
+        {% if ticket.resolution %}
+        <tr>
+            <th colspan='2'>{% trans "Resolution" %}{% if ticket.get_status_display == "Resolved" %}
+                <a href='{{ ticket.ticket_url }}&close'>
+                    <button type="button" class="btn btn-primary btn-xs">{% trans "Accept and Close" %}</button>
+                </a>{% endif %}
+            </th>
+        </tr>
+        <tr><td colspan='2'>{{ ticket.get_resolution_markdown }}</td></tr>
+        {% endif %}
+    </tbody>
+</table>
+
+{% if ticket.followup_set.public_followups %}
+<h3>{% trans "Follow-Ups" %}</h3>
+{% load ticket_to_link %}
+{% for followup in ticket.followup_set.public_followups %}
+<div class='followup well' style="padding:5px;margin:10px;">
+    <div class='title'>
+        <h5>{{ followup.title }} {% if followup.user %}by <span class='byline text-info'>{{ followup.user.get_full_name|default:followup.user.get_username }}</span>{% endif %} <span title='{{ followup.date|naturaltime }}'>({{ followup.date|date:"DATETIME_FORMAT" }})</span></h5>
+    </div>
+    {% if followup.user %}{{ followup.get_markdown|num_to_link }}
+    {% else %}{{ followup.comment|force_escape|urlizetrunc:50|num_to_link|linebreaksbr }}{% endif %}
+    {% if followup.ticketchange_set.all %}<div class='changes'><ul>
+        {% for change in followup.ticketchange_set.all %}
+        {% if change.old_value == 'Replied' and change.new_value != 'New' and change.new_value != 'Open' and change.new_value != 'Reopened' %}
+        <li>{% blocktrans with change.field as field and 'Open' as old_value and change.new_value as new_value %}Changed {{ field }} from {{ old_value }} to {{ new_value }}.{% endblocktrans %}</li>
+        {% elif change.new_value == 'Replied' and  change.old_value != 'New' and change.old_value != 'Open' and change.old_value != 'Reopened' %}
+        <li>{% blocktrans with change.field as field and change.old_value as old_value and 'Open' as new_value %}Changed {{ field }} from {{ old_value }} to {{ new_value }}.{% endblocktrans %}</li>
+        {% elif change.old_value == 'Replied' or change.new_value == 'Replied' %}
+        {% else %}
+        <li>{% blocktrans with change.field as field and change.old_value as old_value and change.new_value as new_value %}Changed {{ field }} from {{ old_value }} to {{ new_value }}.{% endblocktrans %}</li>
+        {% endif %}
+        {% endfor %}
+    </ul></div>{% endif %}
+    {% for attachment in followup.followupattachment_set.all %}{% if forloop.first %}<div class='attachments'><ul>{% endif %}
+        <li><a href='{{ attachment.file.url }}'>{{ attachment.filename }}</a> ({{ attachment.mime_type }}, {{ attachment.size|filesizeformat }})</li>
+    {% if forloop.last %}</ul></div>{% endif %}
+    {% endfor %}
+</div>
+{% endfor %}
+{% endif %}
+
+{% endblock %}
+
+
+{% block helpdesk_js %}
+<script type='text/javascript' language='javascript'>
+$(document).ready(function() {
+    $("#ShowFileUpload").click(function() {
+        $("#FileUpload").fadeIn();
+        $("#ShowFileUploadPara").hide();
+        return false;
+    });
+
+    // lists for file input change events, then updates the associated text label
+    // with the file name selected
+    $('.add_file_fields_wrap').on('fileselect', ':file', function(event, numFiles, label, browseButtonNum) {
+        $("#selectedfilename"+browseButtonNum).html(label);
+    });
+
+    var x = 0;
+    var wrapper         = $(".add_file_fields_wrap"); //Fields wrapper
+    var add_button      = $(".add_file_field_button"); //Add button ID
+
+    $(add_button).click(function(e){ //on add input button click
+        x++;
+        e.preventDefault();
+        $(add_button).before("<div><label class='btn btn-primary btn-sm btn-file'>Browse... <input type='file' name='attachment' id='file" + x + "' multiple style='display: none;'/></label><span>&nbsp;</span><span id='selectedfilename" + x + "'>{% trans 'No files selected.' %}</span></div>"); //add input box
+    });
+
+});
+
+// this function listens for changes on any file input, and
+// emits the appropriate event to update the input's text.
+// Needed to have properly styled file input buttons! (this really shouldn't be this hard...)
+$(document).on('change', ':file', function() {
+    var input = $(this),
+        inputWidgetNum = $(this).attr('id').split("file")[1],
+        numFiles = input.get(0).files ? input.get(0).files.length : 1,
+        label = input.val().replace(/\\/g, '/').replace(/.*\//, '');
+    input.trigger('fileselect', [numFiles, label, inputWidgetNum]);
+});
+</script>
+
+{% endblock %}

@@ -246,7 +246,11 @@ urlpatterns = [
         staff.export_report,
         name="export_report"),
 ]
-
+"""
+   url(r'^tickets/view/(?P<ticket_id>[0-9]+)/$',
+       public.ticket_detail,
+       name='ticket_detail'),    
+"""
 urlpatterns += [
     # 9/24: Removed form and 'View Ticket' feature from homepage -- so just display the KB home. Add this back later
     # url(r'^$',
@@ -256,6 +260,10 @@ urlpatterns += [
     url(r'^tickets/submit/(?P<form_id>[0-9]+)/$',
         public.create_ticket,
         name='submit'),
+
+    url(r'^tickets/view/all',
+        public.ticket_list_owner,
+        name='ticket_list_owner'),
 
     url(r'^tickets/submit_iframe/$',
         public.CreateTicketIframeView.as_view(),
