@@ -14,6 +14,10 @@ def get(value, arg, default=None):
     """ Call the dictionary get function """
     return value.get(arg, default)
 
+@register.filter
+def get_type(value):
+    """Call the type function on the value"""
+    return type(value).__name__
 
 @register.filter(expects_localtime=True)
 def datetime_string_format(value):

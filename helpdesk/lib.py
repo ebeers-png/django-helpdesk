@@ -11,9 +11,10 @@ from mimetypes import guess_type
 
 from django.conf import settings
 from django.utils.encoding import smart_text
-
-from helpdesk.models import FollowUpAttachment
-
+from helpdesk.models import FollowUpAttachment, FormType, is_extra_data
+from seed.serializers.properties import PropertyStateSerializer
+from seed.serializers.taxlots import TaxLotStateSerializer
+from seed.models import PropertyView, TaxLotView
 
 logger = logging.getLogger(__name__)
 
@@ -181,3 +182,61 @@ def format_time_spent(time_spent):
     else:
         time_spent = ""
     return time_spent
+
+def find_beam_view(org_id, cycle_id, column, unique_id):
+    """
+    Find a BEAM inventory view with a unique identifying value
+
+    :param org_id: ID of organization to search in
+    :param cycle_id: ID of cycle to search in
+    :param column: Column object containing unique identifier to lookup
+    :param unique_id: value to search for in the Column
+    """
+    from django.db.models import Q
+
+    if column.is_extra_data:
+        lookup = Q(**{f'state__extra_data__{column.column_name}': unique_id})
+    else: 
+        lookup = Q(**{f'state__{column.column_name}': unique_id})
+    
+    if column.table_name == 'PropertyState':
+        return PropertyView.objects.filter(lookup, property__organization_id=org_id, cycle_id=cycle_id).first()
+    else: 
+        return TaxLotView.objects.filter(lookup, property__organization_id=org_id, cycle_id=cycle_id).first()
+
+def get_beam_state(org_id, view_id, inventory_type):
+    if inventory_type == 'PropertyState':
+        view = PropertyView.objects.filter(state__organization_id=org_id, id=view_id).first()
+        state = PropertyStateSerializer(view.state).data
+    else:
+        view = TaxLotView.objects.filter(state__organization_id=org_id, id=view_id).first()
+        state = TaxLotStateSerializer(view.state).data
+        
+    return state
+
+def map_form_fields_to_state_data(state_data, form_id, inventory_type):
+    form_fields = FormType.objects.get(pk=form_id).customfield_set.exclude(column__isnull=True).select_related("column")
+    
+    beam_data = {}
+    for f in form_fields:
+        if f.column.table_name == inventory_type:
+            value = ''
+            if f.column.column_name and hasattr(f.column, 'is_extra_data') and f.column.table_name:
+                if f.column.is_extra_data and f.column.column_name in state_data['extra_data']:
+                    value = state_data['extra_data'][f.column.column_name]
+                elif not f.column.is_extra_data and f.column.column_name in state_data:
+                    value = state_data[f.column.column_name]
+            
+            field_name = 'e_' + f.field_name if is_extra_data(f.field_name) else f.field_name
+            
+            if value:
+                if value in [True, 'true', 'True', 'TRUE', 'yes']:
+                    value = 'Yes'
+                    
+                cast_value = f.column.cast(value)
+                if cast_value:
+                    beam_data[field_name] = cast_value
+                else:
+                    beam_data[field_name] = value   
+            
+    return beam_data

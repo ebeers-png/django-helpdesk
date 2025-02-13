@@ -99,6 +99,19 @@
         $('[id^=colsearch_]').on('input', debounced())
     })
 
+    let multi_pair_input = $('#id_multi_pair')
+    let prepopulate_input = $('#id_prepopulate')
+
+    // Enforce exclusivity of multi_pair and prepopulate options
+    multi_pair_input.on('click', () => exclusive(multi_pair_input, prepopulate_input))
+    prepopulate_input.on('click', () => exclusive(prepopulate_input, multi_pair_input))
+
+    function exclusive(target, other) {
+        if (target.prop('checked')) {
+            other.prop('checked', false)
+        }
+    }
+
     function removeEmpty() {
         if (document.querySelector('#edit_form').checkValidity()) {
             document.querySelector('#custom_field_empty').remove()
