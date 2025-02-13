@@ -22,7 +22,7 @@ from django.contrib.auth import get_user_model
 from django.utils import timezone
 from django.shortcuts import get_object_or_404
 
-from helpdesk.lib import _update_building_data, safe_template_context, process_attachments, pair_properties_by_form
+from helpdesk.lib import _update_building_data, safe_template_context, process_attachments, pair_properties_by_form, validate_properties_on_ticket
 from helpdesk.models import (DependsOn, Ticket, Queue, FollowUp, IgnoreEmail, TicketCC,
                              CustomField, TicketDependency, UserSettings, KBItem, Tag,
                              FormType, KBCategory, KBIAttachment, is_extra_data, PreSetReply, EmailTemplate, clean_html)
@@ -1089,14 +1089,18 @@ class AbstractTicketForm(CustomFieldMixin, forms.Form):
         if ticket_form.auto_pair:
             pair_properties_by_form(None, ticket_form, [ticket])
             
-            # TODO: validate user (e.g. check ticket email address on property state)
-            
             properties_paired = ticket.beam_property.count()
             taxlots_paired = ticket.beam_taxlot.count()
             portfolios_paired = ticket.beam_portfolio.count()
 
             if properties_paired or taxlots_paired or portfolios_paired:
                 cycle = ticket_form.push_cycle
+                validate_properties_on_ticket(ticket, ticket_form.organization_id, cycle.id)
+                
+                # Refresh pair counts after validation
+                properties_paired = ticket.beam_property.count()
+                taxlots_paired = ticket.beam_taxlot.count()
+                portfolios_paired = ticket.beam_portfolio.count()
                 
                 # Auto-Create Portfolios
                 if properties_paired and portfolios_paired <= 1 and ticket_form.auto_create_portfolio:

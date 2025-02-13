@@ -10,6 +10,7 @@ import logging
 from mimetypes import guess_type
 
 from django.conf import settings
+from django.db.models import Q
 from django.http import HttpRequest, QueryDict
 from django.shortcuts import get_object_or_404
 from django.utils.encoding import smart_text
@@ -19,7 +20,7 @@ from seed.serializers.taxlots import TaxLotStateSerializer
 from seed.models import (
     PropertyState, TaxLotState, PortfolioState, 
     PropertyView, TaxLotView, PortfolioView, 
-    Property, TaxLot, Portfolio, Cycle
+    Property, TaxLot, Portfolio, Cycle, Column
 )
 from seed.views.v3.portfolios import PortfolioViewSet
 from seed.views.v3.properties import PropertyViewSet
@@ -372,3 +373,53 @@ def _update_building_data(user, inventory_type, cycle_id, view_id, ticket_id, fi
     viewset.request = update_request
     response = viewset.update(update_request, pk=pk)
     return response
+
+def validate_properties_on_ticket(ticket, org_id, cycle_id):
+    """
+    Validate a ticket submitter's permission to access the inventory views associated with a ticket
+    
+    Removes properties, taxlots, and portfolios that are not accessible by the submitter from the ticket.
+    
+    Only triggered on auto-pair / auto-copy, so additional inventory views can be added manually by staff.
+    """
+    email_columns = Column.objects.filter(organization_id=org_id, owner_portal_access=True).values('is_extra_data', 'column_name', 'table_name')
+    email_ref = ticket.submitter_email
+    
+    # Generate email validation queries for inventory views
+    property_view_queries = Q()
+    taxlot_view_queries = Q()
+    for col in email_columns:
+        if col['is_extra_data']:
+            lookup = "state__extra_data__" + col['column_name'] + "__iexact"
+        else:
+            lookup = "state__" + col['column_name'] + "__iexact"
+        
+        if col['table_name'] == 'TaxLotState':
+            property_lookup = lookup
+            taxlot_lookup = 'taxlotproperty__taxlot_view__' + lookup
+        else:
+            property_lookup = 'taxlotproperty__property_view__' + lookup
+            taxlot_lookup = lookup
+        property_subq = Q(**{property_lookup: email_ref})
+        taxlot_subq = Q(**{taxlot_lookup: email_ref})
+        property_view_queries = property_view_queries | property_subq
+        taxlot_view_queries = taxlot_view_queries | taxlot_subq
+        
+    if ticket.beam_property.count():
+        properties = PropertyView.objects.filter(property_view_queries, cycle_id=cycle_id, property__in=ticket.beam_property).values_list('property_id', flat=True)
+        allowed = ticket.beam_property.filter(pk__in=properties)
+        ticket.beam_property.set(allowed)
+        
+    if ticket.beam_taxlot.count():
+        taxlots = TaxLotView.objects.filter(taxlot_view_queries, cycle_id=cycle_id, property__in=ticket.beam_property).values_list('taxlot_id', flat=True)
+        allowed = ticket.beam_taxlot.filter(pk__in=taxlots)
+        ticket.beam_taxlot.set(allowed)
+        
+    if ticket.beam_portfolio.count():
+        allowed = []
+        for portfolio in ticket.beam_portfolio:
+            view = portfolio.views.filter(cycle_id=cycle_id).first()
+            if view and view.properties.filter(property_view__property__in=ticket.beam_property).exists():
+                allowed.append(portfolio.id)
+        allowed = ticket.beam_portfolio.filter(pk__in=allowed)
+        ticket.beam_portfolio.set(allowed)
