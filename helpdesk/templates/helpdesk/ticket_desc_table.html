@@ -36,6 +36,10 @@ copy_public_link = function() {
                                     <i class="fas fa-city"></i> {% trans "Auto-pair to BEAM inventory" %}
                                 </a></span>
 
+                                <span><a href="#" class="btn btn-primary btn-sm"  data-toggle="modal" data-target="#dqUpdateModal">
+                                    <i class="fas fa-flag"></i> {% trans "Update Property status" %}
+                                </a></span>
+
                                 {% if not ticket.beam_property.count and not ticket.beam_taxlot.count %} <span class="tooltip-wrapper" data-toggle="tooltip" data-placement="top" title="Must be paired to a BEAM building to copy data over."> {% else %} <span> {% endif %}
                                 <a href="{% url 'helpdesk:copy_to_beam' ticket.id %}"
                                     {% if not ticket.beam_property.count and not ticket.beam_taxlot.count %} class="btn btn-secondary btn-sm disabled" aria-disabled="true"
@@ -265,6 +269,81 @@ copy_public_link = function() {
 </div>
 <!-- /.card -->
 
+<div class="modal fade" id="dqUpdateModal" tabindex="-1" role="dialog" aria-labelledby="dqUpdateModalLabel" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Update Property Status</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <form id="statusUpdateForm" action="{% url 'helpdesk:update_ticket_inventory_status' ticket.id %}" method="post">
+                    {% csrf_token %}
+                    <div class="form-group">
+                        <label for="cycle_id">Cycle:</label>
+                        <select name="cycle_id" id="cycle_id" class="form-control">
+                            <option value="">-- Select a Cycle --</option>
+                            {% for cycle in cycles %}
+                                <option value="{{ cycle.id }}">{{ cycle.name }}</option>
+                            {% endfor %}
+                        </select>
+                        <div id="cycle-error-message" style="display: none; color: red;">Please select a cycle.</div>
+                    </div>
+                
+                    <div class="form-group">
+                        <label for="status_action">Mark Status:</label>
+                        <select name="status_action" id="status_action" class="form-control">
+                            <optgroup label="Set 
+                                {% if ticket.ticket_form.organization.name == 'NYC' %}
+                                    exception
+                                {% else %}
+                                    exemption
+                                {% endif %}
+                            ">
+                                <option value='{"status_id": null, "exempt": true, "sticky": null}'>
+                                    {% if ticket.ticket_form.organization.name == 'NYC' %}
+                                        Exception
+                                    {% else %}
+                                        Exempt
+                                    {% endif %}
+                                </option>
+                                <option value='{"status_id": null, "exempt": false, "sticky": null}'>
+                                    {% if ticket.ticket_form.organization.name == 'NYC' %}
+                                        No Exception
+                                    {% else %}
+                                        Not Exempt
+                                    {% endif %}
+                                </option>
+                            </optgroup>
+                            <optgroup label="Sticky Status">
+                                {% for status in dq_statuses %}
+                                    <option value='{"status_id": {{ status.id }}, "exempt": null, "sticky": true}'>{{ status.name }}</option>
+                                {% endfor %}
+                                <option value='{"status_id": 0, "exempt": null, "sticky": true}'>No Status</option>
+                            </optgroup>
+                            <optgroup label="Temporary Status">
+                                {% for status in dq_statuses %}
+                                    <option value='{"status_id": {{ status.id }}, "exempt": null, "sticky": false}'>{{ status.name }}</option>
+                                {% endfor %}
+                                <option value='{"status_id": 0, "exempt": null, "sticky": false}'>No Status</option>
+                            </optgroup>
+                        </select>
+                    </div>
+                
+                    <!-- Hidden fields -->
+                    <input type="hidden" name="status_id" id="status_id" value="">
+                    <input type="hidden" name="exempt" id="exempt" value="">
+                    <input type="hidden" name="sticky" id="sticky" value="">
+                
+                    <button type="submit" class="btn btn-primary">Confirm</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
 {% block helpdesk_js %}
 <script type='text/javascript' language='javascript'>
 $(document).ready(function() {
@@ -384,6 +463,65 @@ $(document).ready(function() {
         }
     });
 
+    $('#status_action').on('change', function () {
+        const selectedValue = $(this).val();
+    
+        if (selectedValue) {
+            try {
+                const parsed = JSON.parse(selectedValue);
+    
+                // Update the hidden fields
+                $('#status_id').val(parsed.status_id !== null ? parsed.status_id : '');
+                $('#exempt').val(parsed.exempt !== null ? parsed.exempt : '');
+                $('#sticky').val(parsed.sticky !== null ? parsed.sticky : '');
+    
+                console.log("Updated Fields:", {
+                    status_id: parsed.status_id,
+                    exempt: parsed.exempt,
+                    sticky: parsed.sticky,
+                });
+            } catch (error) {
+                console.error("Error parsing the selected value:", error);
+            }
+        }
+    });
+    
+    $('#statusUpdateForm').on('submit', function (e) {
+        e.preventDefault();
+        const cycleId = $('#cycle_id').val();
+        const statusActionSelected = $('#status_action').val();
+    
+        if (!cycleId) {
+            $('#cycle-error-message').show();
+            return;
+        } else {
+            $('#cycle-error-message').hide();
+        }
+
+        if (!statusActionSelected) {
+            $('#status_id').val('');
+            $('#sticky').val('');
+            $('#exempt').val('true');
+        } else {
+            try {
+                const parsed = JSON.parse(statusActionSelected);
+                $('#status_id').val(parsed.status_id !== null ? parsed.status_id : '');
+                $('#exempt').val(parsed.exempt !== null ? parsed.exempt : '');
+                $('#sticky').val(parsed.sticky !== null ? parsed.sticky : '');
+    
+                console.log("Updated Fields:", {
+                    status_id: parsed.status_id,
+                    exempt: parsed.exempt,
+                    sticky: parsed.sticky,
+                });
+            } catch (error) {
+                console.error("Error parsing the selected value:", error);
+                return; // Stop submission if parsing fails
+            }
+        }
+        this.submit();
+    });
+    
 });
 
 </script>
