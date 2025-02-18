@@ -85,6 +85,7 @@
                         <option value="take">Take (Assign to me)</option>
                         <option value="delete">Delete</option><option value="merge">Merge</option>
                         <option value="export">Export</option><option value="pair">Pair to BEAM inventory</option>
+                        <option value="bulk_reply">Bulk Reply</option>
                         <optgroup label="Close">
                             <option value="close">Close (Don't Send E-Mail)</option>
                             <option value="close_public">Close (Send E-Mail)</option>
@@ -97,7 +98,7 @@
                         </optgroup>
                     </select>
                     <div class="input-group-append">
-                        <button id="massActionButton" type="button" onclick="massUpdate()" class="btn btn-outline-secondary" disabled>Run Action <i class="fa fa-arrow-circle-right mr-1"></i></button>
+                        <button id="massActionButton" type="button" onclick="onMassActionClick()" class="btn btn-outline-secondary" disabled>Run Action <i class="fa fa-arrow-circle-right mr-1"></i></button>
                     </div>
                 </div>
                 <!-- Pass vars to View for exporting to work Properly -->
@@ -155,6 +156,10 @@
             </div>
         </div>
     </div>
+
+
+    {% include 'helpdesk/include/bulk_replies.html' with preset_replies=preset_replies %}
+
     <!-- / Action Toolbar -->
     <div class="row">
     <div class="col-sm-8 col-md-9 col-lg-10 order-1 pl-3">
@@ -595,14 +600,38 @@
         }
     }
 
+    function onMassActionClick() {
+        const mass_action = $('#id_mass_action').val();
+        
+        if (mass_action == 'bulk_reply') {
+            $('#bulkRepliesModal').modal('show');
+            return;
+        }
+        const form = document.forms['ticket_mass_update'];
+        const formData = new FormData(form);
+        massUpdate(formData); 
+    }
+
+    function onBulkRepliesConfirm() {
+        const preset_id = $("#id_preset").val();
+        const id_public = $('#id_public').prop('checked');
+        const form = document.forms['ticket_mass_update'];
+        let formData = new FormData(form);
+        formData.append('preset_id', preset_id);
+        formData.append('public', id_public);
+        
+        massUpdate(formData); 
+        $('#bulkRepliesModal').modal('hide');
+    }
+
     // Perform ticket mass update asynchronously, then
     // reload page with current query and ticket view preferences
-    function massUpdate() {
+    function massUpdate(formData) {
         let refreshFlag = true;
         $.ajax({
             url: "{% url 'helpdesk:mass_update' %}",
             type: 'POST',
-            data: new FormData(document.forms['ticket_mass_update']),
+            data: formData,
             processData: false,
             contentType: false,
             xhrFields: {

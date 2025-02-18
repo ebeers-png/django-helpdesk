@@ -30,6 +30,7 @@ from django.utils.html import escape
 from django.utils import timezone
 from django.utils.safestring import mark_safe
 from django.views.generic.edit import FormView, UpdateView
+from django.template import engines
 
 from helpdesk.forms import CUSTOMFIELD_DATE_FORMAT, CUSTOMFIELD_DATETIME_FORMAT, PreviewWidget
 from helpdesk.query import (
@@ -1556,6 +1557,53 @@ def mass_update(request):
     elif action == 'take':
         user = request.user
         action = 'assign'
+    elif action == 'bulk_reply':
+        date = timezone.now()
+        preset_template_id = request.POST.get('preset_id')
+        is_public = request.POST.get('public') == 'true'
+
+        org = request.user.default_organization.helpdesk_organization
+        user = request.user
+        preset_template = PreSetReply.objects.get(id=preset_template_id)
+        ticket_list = Ticket.objects.filter(id__in=tickets)
+        # breakpoint()
+        for ticket in ticket_list:
+            context = None
+            context = safe_template_context(ticket)
+            context['private'] = False
+            comment = preset_template.body
+            template_func = engines['django'].from_string
+            comment = comment.replace('{%', 'X-HELPDESK-COMMENT-VERBATIM').replace('%}', 'X-HELPDESK-COMMENT-ENDVERBATIM')
+            comment = comment.replace('X-HELPDESK-COMMENT-VERBATIM', '{% verbatim %}{%').replace('X-HELPDESK-COMMENT-ENDVERBATIM', '%}{% endverbatim %}')
+            comment = template_func(comment).render(context)
+            f = FollowUp.objects.create(
+                ticket=ticket,
+                title='Comment',
+                date=date,
+                public=is_public,
+                comment=comment,
+                message_id=None,
+                user=user
+            )
+            # if setting the ticket's status:
+            # f.new_status = Ticket.CLOSED_STATUS
+            # ticket.status = Ticket.CLOSED_STATUS
+            # ticket.save()
+            # f.save()
+            context.update(comment=f.comment)
+            roles = {'submitter': ('updated_submitter', context),
+                'assigned_to': ('updated_owner', context),
+                'cc_users': ('updated_cc_user', context),
+                'queue_updated': ('updated_cc_user', context)}
+            if ticket.queue.enable_notifications_on_email_events:
+                roles['cc_public'] = ('updated_cc_public', context)
+                roles['extra'] = ('updated_cc_public', context)
+            ticket.send_ticket_mail(
+                roles,
+                organization=org,
+                fail_silently=True,
+                source="updated (script)"
+            )
     elif action == 'merge':
         # Redirect to the Merge View with selected tickets id in the GET request
         return redirect(
@@ -2119,6 +2167,8 @@ def ticket_list(request):
         form_choices=form_choices,
         priority_choices=Ticket.PRIORITY_CHOICES,
         status_choices=Ticket.STATUS_CHOICES,
+        preset_replies=PreSetReply.objects.filter(organization=org),
+        # .filter(Q(queues=ticket.queue) | Q(queues__isnull=True)),
         tag_choices=tag_choices,
         urlsafe_query=urlsafe_query,
         user_saved_queries=user_saved_queries,
