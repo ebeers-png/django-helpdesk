@@ -385,9 +385,12 @@ def edit_article(request, slug, pk, iframe=False):
 
                     if cf['file']:
                         attach = cf['id'] if cf['id'] else KBIAttachment()
+                        # To Do: Verify if reassigning the KBItem ID is redundant since it is already set in upload_attachment(). 
+                        # Consider using FILE_UPLOAD_TEMP_DIR and TemporaryUploadedFile to handle cases where users abandon the form after file upload.
+                        # if isinstance(uploaded_file, TemporaryUploadedFile):
+                        #      pass:
                         attach.kbitem = item
-                        attach.file = cf['file']  # .file
-                        # attach.filename = cf['file']
+                        # attach.file = cf['file']  # This line will assign file to attachment again and duplicates the file in the storage.
 
                         attach.save()
         if manage:
