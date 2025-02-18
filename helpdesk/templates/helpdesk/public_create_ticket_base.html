@@ -54,9 +54,11 @@
                     {% endwith %}
                 {% endif %}
             {% endfor %}
+            {% if form.view_only == False%}
             <button type="submit" class="btn btn-primary btn-lg btn-block">
                 <i class="fa fa-send"></i> {% trans "Submit Ticket" %}
             </button>
+            {% endif %}
         </form>
     {% else %}
         <p>{% trans "Public ticket submission is disabled. Please contact the administrator for assistance." %}</p>
@@ -108,7 +110,7 @@
 
             }
             dependent_element.attr('hidden', show ? null : 'True')
-            dependent_input.attr('disabled', show ? null : 'True')
+            dependent_input.attr('disabled', show ? dependent_input.attr('data-read-only') ?? null : 'True')
 
             // Cascade down to its dependents
             if (PARENT_TO_DEPENDENTS[dependent_name]) {
