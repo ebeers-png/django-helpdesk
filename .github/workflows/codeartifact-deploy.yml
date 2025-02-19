@@ -3,10 +3,7 @@ name: Publish Package
 on:
   push:
     branches:
-      - develop
-    paths:
-      - ".github/workflows/**"
-      - ".releaserc.json"
+      - "develop"
 
 jobs:
 
