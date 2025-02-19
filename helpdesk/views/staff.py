@@ -367,6 +367,7 @@ def create_form(request):
                 'public': formtype.public,
                 'staff': formtype.staff,
                 'unlisted': formtype.unlisted,
+                'multi_pair': formtype.multi_pair,
                 'prepopulate': formtype.prepopulate,
                 'pull_cycle': formtype.pull_cycle,
                 'view_only': formtype.view_only
@@ -395,6 +396,7 @@ def create_form(request):
             formtype.public = form.cleaned_data['public']
             formtype.staff = form.cleaned_data['staff']
             formtype.unlisted = form.cleaned_data['unlisted']
+            formtype.multi_pair = form.cleaned_data['multi_pair']
             formtype.prepopulate = form.cleaned_data['prepopulate']
             formtype.pull_cycle = form.cleaned_data['pull_cycle']
             formtype.view_only = form.cleaned_data['view_only']
@@ -456,6 +458,7 @@ def edit_form(request, pk):
                 'public': formtype.public,
                 'staff': formtype.staff,
                 'unlisted': formtype.unlisted,
+                'multi_pair': formtype.multi_pair,
                 'prepopulate': formtype.prepopulate,
                 'pull_cycle': formtype.pull_cycle,
                 'view_only': formtype.view_only
@@ -487,6 +490,7 @@ def edit_form(request, pk):
                     formtype.public = form.cleaned_data['public']
                     formtype.staff = form.cleaned_data['staff']
                     formtype.unlisted = form.cleaned_data['unlisted']
+                    formtype.multi_pair = form.cleaned_data['multi_pair']
                     formtype.prepopulate = form.cleaned_data['prepopulate']
                     formtype.pull_cycle = form.cleaned_data['pull_cycle']
                     formtype.view_only = form.cleaned_data['view_only']
@@ -3325,7 +3329,14 @@ def _pair_properties_by_form(request, form, tickets):
             # Creates a query term and pairs it with the value
             # TODO: Check for the data type and cast value as that type before putting it in lookups?
             if f.column.column_name and hasattr(f.column, 'is_extra_data') and f.column.table_name:
-                query_term = 'extra_data__%s' % f.column.column_name if f.column.is_extra_data else f.column.column_name
+                if f.column.is_extra_data:
+                    query_term = 'extra_data__%s' % f.column.column_name
+                else:
+                    query_term = f.column.column_name
+                
+                if isinstance(value, list):
+                    query_term += '__in'
+                
                 lookups[f.column.table_name][query_term] = value
 
         property_lookup, taxlot_lookup = None, None
@@ -3515,6 +3526,13 @@ def get_building_data(request, ticket_id):
                     elif hasattr(ticket, f.field_name) \
                             and getattr(ticket, f.field_name, None) is not None and getattr(ticket, f.field_name, None) != '':
                         value = getattr(ticket, f.field_name, None)
+
+                        # Use property ID instead of ticket value for lists of IDs
+                        if f.field_name == 'building_id' and isinstance(value, list):
+                            if f.column.is_extra_data and f.column.column_name in state['extra_data']:
+                                value = state['extra_data'][f.column.column_name]
+                            elif not f.column.is_extra_data and f.column.column_name in state:
+                                value = state[f.column.column_name]
                     else:
                         value = ''
 

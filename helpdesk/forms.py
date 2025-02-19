@@ -84,9 +84,16 @@ class CustomFieldMixin(object):
         # if-elif branches start with special cases
         if field.data_type is None:
             fieldclass = forms.NullBooleanField
-        elif field.field_name == 'building_id' and kwargs.get('prepopulate', False):
-            fieldclass = forms.CharField
-            instanceargs['widget'] = PrepopulateFormInput(attrs={'class': 'form-control'})  
+        elif field.field_name == 'building_id' and (kwargs.get('prepopulate', False) or kwargs.get('multi_pair', False)):
+            if kwargs.get('prepopulate', False):
+                fieldclass = forms.CharField
+                instanceargs['widget'] = PrepopulateFormInput(attrs={'class': 'form-control'})
+            elif kwargs.get('multi_pair', False):
+                fieldclass = MatchOnField
+                instanceargs['num_widgets'] = 1
+                instanceargs['field_type'] = forms.CharField()
+                instanceargs['widget_type'] = forms.TextInput(attrs={'class': 'form-control'})
+                del instanceargs['widget']
         elif field.data_type == 'varchar':
             fieldclass = forms.CharField
             instanceargs['max_length'] = field.max_length
@@ -803,6 +810,10 @@ class AbstractTicketForm(CustomFieldMixin, forms.Form):
                 label=_('Knowledge Base Item'),
                 choices=[(kbi.pk, kbi.title) for kbi in KBItem.objects.filter(category=kbcategory.pk, enabled=True)],
             )
+        
+        # Handle multiple building ids
+        if form.multi_pair:
+            self.fields['agg_building_id'] = forms.JSONField(widget=forms.HiddenInput(), required=False)
 
         # Two-way map parents and dependents for use in the front-end
         self.parent_to_dependents = defaultdict(list)
@@ -887,6 +898,10 @@ class AbstractTicketForm(CustomFieldMixin, forms.Form):
                 elif isinstance(value, Decimal):
                     value = str(value)
                 cleaned_data[field] = value
+
+        # Set building ID to the filtered list collected in agg_building_id
+        if 'agg_building_id' in cleaned_data:
+            cleaned_data['building_id'] = [building_id for building_id in cleaned_data['agg_building_id'] if building_id]
 
         # Reattach files since the attachment field will only parse the first one
         if self.files:
@@ -1146,8 +1161,11 @@ class AbstractTicketForm(CustomFieldMixin, forms.Form):
             if self.form_queue:
                 queryset = queryset.exclude(field_name='queue')
                 
-            if FormType.objects.get(pk=self.form_id).prepopulate:
-                kwargs.update(prepopulate=True)
+            form = FormType.objects.get(pk=self.form_id)
+            if form.prepopulate:
+                kwargs.update(prepopulate=True)  
+            elif form.multi_pair:
+                kwargs.update(multi_pair=True)
 
             for field in queryset:
                 if field.field_name in self.fields:

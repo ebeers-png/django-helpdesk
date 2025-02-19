@@ -77,7 +77,7 @@
                         {% endif %}
                     {% endfor %}
                     {% if form.view_only == False%}
-                    <button type="submit" class="btn btn-primary btn-lg btn-block">
+                    <button type="submit" onclick='aggMultiText()' class="btn btn-primary btn-lg btn-block">
                         <i class="fa fa-send"></i> {% trans "Submit Ticket" %}
                     </button>
                     {% endif %}
@@ -159,6 +159,16 @@
                 updateParentField(parent)
             })
             updateParentField(parent)
+        }
+
+        function aggMultiText() {
+            for (const agg of document.querySelectorAll('[name$=agg_building_id]')) {
+                agg_strings = []
+                for (const string of document.getElementById('building_id_strings').children) {
+                    agg_strings.push(string.children[0].value)
+                }
+                agg.value = JSON.stringify(agg_strings)
+            }
         }
     </script>
 {% endblock %}

@@ -126,6 +126,7 @@ copy_public_link = function() {
                                 {% elif "date" == field.data_type %}{{ field.value|datetime_string_format }}
                                 {% elif "time" == field.data_type %}{{ field.value|datetime_string_format }}
                                 {% elif "boolean" == field.data_type %}{{ field.value }}
+                                {% elif "building_id" == field.field_name and field.value|get_type == 'list' %}{{ field.value|join:", "}}
                                 {% else %}{{ field.value|default:"" }}
                                 {% endif %}{% endspaceless %}</td>
                         {% if not row %}</tr>{% endif %}
