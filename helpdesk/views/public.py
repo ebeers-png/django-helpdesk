@@ -9,6 +9,7 @@ views/public.py - All public facing views, eg non-staff (no authentication
 import logging
 from csv import DictReader
 from os.path import join
+import os
 from importlib import import_module
 
 import requests
@@ -463,9 +464,10 @@ def _check_order(order):
     Look up order using the order's token.
     """
     url = f'https://securecheckout-uat.cdc.nicusa.com/ccprest/api/v1/co/tokens/{order.token}'
-    merchant_code = settings.PAYMENT_MERCHANT_CODE_SECRET
-    merchant_key = settings.PAYMENT_MERCHANT_KEY_SECRET
-    api_key = settings.PAYMENT_API_KEY
+
+    merchant_code = os.environ['PAYMENT_MERCHANT_CODE_SECRET']
+    merchant_key = os.environ['PAYMENT_MERCHANT_KEY_SECRET']
+    api_key = os.environ['PAYMENT_API_KEY']
 
     headers = {
         "MerchantCode": merchant_code,
@@ -564,11 +566,11 @@ def _prepare_payment(request, order, order_settings):
     Creates the order and sends the order off to the checkout page.
     """
     url = 'https://securecheckout-uat.cdc.nicusa.com/ccprest/api/v1/co/tokens'
-    merchant_code = settings.PAYMENT_MERCHANT_CODE_SECRET
-    merchant_key = settings.PAYMENT_MERCHANT_KEY_SECRET
-    service_code_cc = settings.PAYMENT_SERVICE_CODE_CC
-    service_code_ach = settings.PAYMENT_SERVICE_CODE_ACH
-    api_key = settings.PAYMENT_API_KEY
+    merchant_code = os.environ['PAYMENT_MERCHANT_CODE_SECRET']
+    merchant_key = os.environ['PAYMENT_MERCHANT_KEY_SECRET']
+    service_code_cc = os.environ['PAYMENT_SERVICE_CODE_CC']
+    service_code_ach = os.environ['PAYMENT_SERVICE_CODE_ACH']
+    api_key = os.environ['PAYMENT_API_KEY']
 
     data = {
         "OrderTotal": order.properties.all().count() * 100.00,
