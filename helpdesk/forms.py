@@ -25,7 +25,8 @@ from django.shortcuts import get_object_or_404
 from helpdesk.lib import safe_template_context, process_attachments
 from helpdesk.models import (DependsOn, Ticket, Queue, FollowUp, IgnoreEmail, TicketCC,
                              CustomField, TicketDependency, UserSettings, KBItem, Tag,
-                             FormType, KBCategory, KBIAttachment, is_extra_data, PreSetReply, EmailTemplate, clean_html)
+                             FormType, KBCategory, KBIAttachment, is_extra_data, PreSetReply, EmailTemplate, clean_html,
+                             Order)
 from helpdesk import settings as helpdesk_settings
 from helpdesk.email import create_ticket_cc
 from helpdesk.decorators import list_of_helpdesk_staff
@@ -1513,3 +1514,11 @@ class MultipleTicketSelectForm(forms.Form):
         if len(queues) != 1:
             raise ValidationError(_('All selected tickets must share the same queue in order to be merged.'))
         return tickets
+
+
+class OrderForm(forms.ModelForm):
+    class Meta:
+        model = Order
+        fields = ['payer_first_name', 'payer_last_name', 'payer_email', 'payer_company',
+                  'building_owner_name', 'building_owner_email', 'building_owner_address_line_1',
+                  'building_owner_address_line_2', 'building_owner_city', 'building_owner_state', 'building_owner_zip']

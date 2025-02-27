@@ -1,0 +1,243 @@
+{% extends "helpdesk/public_base.html" %}{% load i18n %}{% load organization_info %}{% organization_info user request as user_info %}
+
+{% load i18n bootstrap4form %}
+
+{% block helpdesk_title %}{% blocktrans %}Payment Portal{% endblocktrans %}{% endblock %}
+
+{% block helpdesk_body %}
+<h2>{% trans "Payment Portal" %}</h2>
+
+<p>Welcome to the Colorado Energy Office's Building Performance Colorado Fee Payment Portal!</p>
+
+<p>Building Performance Colorado is Colorado's statewide benchmarking program, administered by the Colorado Energy Office,
+    and is aimed at increasing energy efficiency and decreasing greenhouse gas emissions in the building sector. This program applies to all buildings that are 50,000 square feet and larger.</p>
+
+<p>In order to comply with Building Performance Colorado's requirements of submitting a benchmarking report or waiver submission,
+    all building owners are required to pay the annual fee of <b>$100 per covered building</b>. If a building owner fails to submit this payment,
+    their building will be marked as non-compliant with this program and may incur future penalties.</p>
+
+<p>This form is for payments for the <b>2025 Reporting Season</b>.</p>
+
+<p>The deadline for submitting your payment is <b>June 1, 2025</b>. Please contact Building Performance Colorado's <a>Help Center</a> if you have any questions.</p>
+
+
+<form id="form-container" method="POST">
+    {% csrf_token %}
+    <input type="hidden" name='org_id' value="{{ user_info.default_org.id }}">
+
+    <div class="order-form card m-2">
+        <h5 class="card-header">Payer Information</h5>
+        <div class="card-body">
+            {% for field in order_form %}{%if 'payer' in field.name %}
+            {% if not forloop.counter|divisibleby:2 %}
+            <div class="row">
+            {% endif %}
+                <div class="col-md-6">
+            {{ field|bootstrap4form }}
+                    </div>
+                {% if not forloop.counter0|divisibleby:2 %}
+            </div>
+            {% endif %}
+            {% endif %}{% endfor %}
+        </div>
+    </div>
+    <div class="m-2">
+    <p>Please select your Building ID below. If you don't find your building's information listed in the tool,
+        you can look up your building information using this <a href="https://co.beam-portal.org/helpdesk/kb/trainings/32/?org=Building%20Performance%20Colorado">Building ID Lookup Tool</a>.<br>
+        If you don't find your building's information listed in the tool, please submit a <a href="https://co.beam-portal.org/helpdesk/tickets/submit/31/?org=Building%20Performance%20Colorado">ticket</a> via the Building Performance Colorado Help Center to be assigned a Colorado Building ID.
+        </p>
+    <p style="color:red;"><b>If you make a payment to the wrong Building ID or Building Address, this cannot be resolved until the end of the reporting season and may affect a building's compliance status. Please ensure correctness before submitting.</b></p>
+    <p>If you are paying the annual fee for multiple buildings, please use the <b>"Add Building"</b> button at the bottom of the page to add additional buildings.</p>
+    </div>
+    <div class="building-form card m-2" id="id_form-0-form">
+        <h5 class="card-header">
+            <span class="float-left">Building ID & Address</span>
+            <span class="float-right"><button class="btn btn-danger" type="button" id="form-0-remove" value="0">Remove</button></span> </h5>
+        <div class="card-body">
+
+            <div class="form-row">
+                <div class="form-group col-md-6 needs-validation">
+                    <label>Building ID</label>
+                    <div class="input-group mb-3">
+                      <input type="hidden" id="id_form-0-id" name="state_id" value="">
+                      <input type="text" class="form-control" id="form-0-autofill-value" name="building_id" value="" placeholder="Building ID" aria-label="Building ID" aria-describedby="button-addon2">
+                      <div class="input-group-append">
+                        <button class="btn btn-outline-secondary autofill-btn" type="button" id="form-0-autofill" value="0">Search</button>
+                    </div>
+                        <div class="invalid-feedback" id="form-0-autofill-error">
+                            Please choose a username.
+                          </div>
+                  </div>
+                </div>
+                <div class="form-group col-md-6 disabled">
+                    <label for="id_form-0-name">Building Name</label>
+                    <p class="form-0-p form-control" style="background-color:#e7ebee;" id="id_form-0-name"></p>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="id_form-0-address_line_1">Address Line 1</label>
+                <p class="form-0-p form-control" style="background-color:#e7ebee;" id="id_form-0-address_line_1"></p>
+            </div>
+            <div class="form-group">
+                <label for="id_form-0-address_line_2">Address Line 2</label>
+                <p class="form-0-p form-control" style="background-color:#e7ebee;" id="id_form-0-address_line_2"></p>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group col-md-4">
+                    <label for="id_form-0-city">City</label>
+                    <p class="form-0-p form-control" style="background-color:#e7ebee;" id="id_form-0-city"></p>
+                </div>
+
+                <div class="form-group col-md-4">
+                    <label for="id_form-0-state">State</label>
+                    <p class="form-0-p form-control" style="background-color:#e7ebee;" id="id_form-0-state"></p>
+                </div>
+
+                <div class="form-group col-md-4">
+                    <label for="id_form-0-zip">Zip</label>
+                    <p class="form-0-p form-control" style="background-color:#e7ebee;" id="id_form-0-zip"></p>
+                </div>
+            </div>
+        </div>
+    </div>
+    <button id="add-form" type="button" class="btn btn-primary btn">Add Building</button>
+    <div class="order-form card m-2">
+        <h5 class="card-header">Building Owner Information</h5>
+        <div class="card-body">
+            {% for field in order_form %}{% if 'payer' not in field.name %}
+                {% if forloop.counter0 == 4 %}<div class="row"><div class="col-md-6">{% endif %}
+                {% if forloop.counter0 == 5 %}</div><div class="col-md-6">{% endif %}
+                {% if forloop.counter0 == 8 %}<div class="row"><div class="col-md-4">{% endif %}
+                {% if forloop.counter0 == 9 or forloop.counter0 == 10 %}</div><div class="col-md-4">{% endif %}
+                {{ field|bootstrap4form }}
+                {% if forloop.counter0 == 5 or forloop.counter0 == 10 %}</div></div>{% endif %}{% endif %}
+            {% endfor %}
+        </div>
+    </div>
+    <div class="m-2">
+        <p>Total Building Fees Due<br>
+            <span style="color:red;">$<span id="id-fees">0</span></span>
+        </p>
+
+        <div class="form-group">
+            <label class="form-label">Would you like to pay via credit card or eCheck?</label>
+
+            <div class="form-check">
+              <input class="form-check-input" type="radio" name="payment_type" id="cc-radio" value="cc" checked>
+              <label class="form-check-label" for="cc-radio">
+                Credit Card
+              </label>
+            </div>
+            <div class="form-check">
+              <input class="form-check-input" type="radio" name="payment_type" id="echeck-radio" value="ach">
+              <label class="form-check-label" for="echeck-radio">
+                eCheck
+              </label>
+            </div>
+
+        </div>
+    </div>
+    <button type="submit" class="btn btn-primary btn">Proceed to Checkout</button>
+</form>
+
+
+
+<script type='text/javascript' language='javascript'>
+
+    {# Bandaid fix for adding asterisks to required fields while the rest of the form is handled by bootstrap4form #}
+    for (const required_field of document.querySelectorAll('[required]')) {
+        document.querySelector('label[for=' + required_field.id + ']').innerHTML += '<span style="color:red;">*</span>'
+    }
+    let buildingForm = document.querySelectorAll(".building-form");
+    let container = document.querySelector("#form-container");
+    let addButton = document.querySelector("#add-form");
+    let totalForms = 0;
+
+    let formNum = buildingForm.length-1;
+    addButton.addEventListener('click', addForm);
+
+    let autofillButtons = document.querySelector(`#form-${formNum}-autofill`);
+    autofillButtons.addEventListener('click', autofill);
+    // let removeButtons = document.querySelector(`#form-${formNum}-remove`);
+    // removeButtons.addEventListener('click', removeForm);
+
+    let buildingSet = new Set();
+
+    function addForm(e){
+        e.preventDefault()
+
+        let newForm = buildingForm[0].cloneNode(true)
+        let formRegex = RegExp(`form-(\\d){1}-`,'g')
+
+        formNum++
+        newForm.innerHTML = newForm.innerHTML.replace(formRegex, `form-${formNum}-`)
+        newForm.id = newForm.id.replace(formRegex, `form-${formNum}-`);
+        container.insertBefore(newForm, addButton)
+        totalForms++;
+
+        // set value of the autofill button to the id of the form
+        let autofillButton = document.querySelector(`#form-${formNum}-autofill`);
+        autofillButton.value = `${formNum}`;
+        autofillButton.addEventListener('click', autofill);
+
+        // set value of the remove button to the id of the form
+        let removeButton = document.querySelector(`#form-${formNum}-remove`);
+        removeButton.value = `${formNum}`;
+        removeButton.addEventListener('click', removeForm);
+
+        // set read-only fields to blank
+        document.querySelectorAll(`p.form-${formNum}-p`).forEach(function(p) {
+            p.innerText = '';
+        });
+    }
+
+    function removeForm(e){
+        let formId = e.target.value;
+        let formToDelete = document.querySelector(`#id_form-${formId}-form`);
+
+        formToDelete.remove()
+
+        buildingSet.delete(formId);
+        $("span#id-fees").text(buildingSet.size * 100);
+    }
+
+    function autofill(e){
+        let formId = e.target.value;
+        let buildingID = document.querySelector(`#form-${formId}-autofill-value`).value;
+
+        $.ajax({
+            url: "{% url 'helpdesk:lookup_building_for_payment' %}",
+            method: 'GET',
+            data: { id: buildingID, org: {{ user_info.default_org.id}} },
+            success: function(response) {
+                let data = response.data;
+                $(`#id_form-${formId}-id`).val(data._state_id);
+                $(`#id_form-${formId}-address_line_1`).text(data.address_line_1);
+                $(`#id_form-${formId}-address_line_2`).text(data.address_line_2);
+                $(`#id_form-${formId}-city`).text(data.city);
+                $(`#id_form-${formId}-state`).text(data.state);
+                $(`#id_form-${formId}-zip`).text(data.zip);
+
+                buildingSet.add(formId);
+                document.querySelector(`#form-${formId}-autofill-value`).classList.remove('is-invalid');
+                $("#id-fees").text(buildingSet.size * 100);
+            },
+            error: function(xhr, status, error) {
+                $(`#id_form-${formId}-id`).val('');
+                $(`#id_form-${formId}-address_line_1`).text('');
+                $(`#id_form-${formId}-address_line_2`).text('');
+                $(`#id_form-${formId}-city`).text('');
+                $(`#id_form-${formId}-state`).text('');
+                $(`#id_form-${formId}-zip`).text('');
+                buildingSet.delete(formId);
+                $(`#form-${formId}-autofill-error`).text(JSON.parse(xhr.responseText).message);
+                document.querySelector(`#form-${formId}-autofill-value`).classList.add('is-invalid');
+                $("#id-fees").text(buildingSet.size * 100);
+            }
+        });
+    }
+
+</script>
+{% endblock %}

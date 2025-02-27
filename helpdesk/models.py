@@ -22,6 +22,7 @@ import os
 import mimetypes
 import datetime
 import logging
+from collections import namedtuple
 
 from django.utils.safestring import mark_safe
 from markdown import markdown
@@ -49,12 +50,19 @@ from seed.models import (
     Column,
     Property,
     TaxLot,
-    Cycle
+    Cycle,
+    DataQualityCheck,
+    StatusLabel,
+    DataQualityStatus
 )
 from seed.utils.storage import get_media_url
 
 
 logger = logging.getLogger(__name__)
+
+
+PAYMENT_STATUS = namedtuple('PAYMENT_STATUS', 'pending failed success')._make(range(3))
+PAYMENT_TYPE = namedtuple('PAYMENT_TYPE', 'cc ach')._make(range(2))
 
 
 def is_extra_data(field_name):
@@ -2310,3 +2318,56 @@ class TicketDependency(models.Model):
 
     def __str__(self):
         return '%s / %s' % (self.ticket, self.depends_on)
+
+
+class Order(models.Model):
+    PAYMENT_STATUS_CHOICES = [(PAYMENT_STATUS.pending, _("pending")), (PAYMENT_STATUS.failed, _("failed")),
+                              (PAYMENT_STATUS.success, _("success"))]
+    PAYMENT_TYPE_CHOICES = [(PAYMENT_TYPE.cc, _("Credit Card")), (PAYMENT_TYPE.ach, _("eCheck"))]
+
+    payer_first_name = models.CharField(max_length=200, verbose_name="Payer First Name")
+    payer_last_name = models.CharField(max_length=200, verbose_name="Payer Last Name")
+    payer_email = models.EmailField(max_length=300, verbose_name="Payer Email")
+    payer_company = models.CharField(max_length=100, verbose_name="Payer Company", blank=True)
+
+    token = models.CharField(max_length=500)
+    token_created = models.DateTimeField(auto_now_add=True)
+
+    payment_status = models.PositiveSmallIntegerField(_("Payment Status"), choices=PAYMENT_STATUS_CHOICES, default=PAYMENT_STATUS.pending)
+    attempt_count = models.IntegerField(default=0)
+    modified = models.DateTimeField(auto_now=True)
+
+    building_owner_name = models.CharField(max_length=400, verbose_name="Building Owner Name")
+    building_owner_email = models.EmailField(max_length=300, verbose_name="Building Owner Email")
+    building_owner_address_line_1 = models.CharField(max_length=1000, verbose_name="Address Line 1")
+    building_owner_address_line_2 = models.CharField(max_length=1000, verbose_name="Address Line 2", blank=True)
+    building_owner_city = models.CharField(max_length=200, verbose_name="City")
+    building_owner_state = models.CharField(max_length=100, verbose_name="State")
+    building_owner_zip = models.CharField(max_length=50, verbose_name="Postal Code")
+
+    payment_type = models.PositiveSmallIntegerField(_("Payment Status"), choices=PAYMENT_TYPE_CHOICES, default=PAYMENT_TYPE.cc)
+
+    organization = models.ForeignKey(Organization, on_delete=models.CASCADE)
+    properties = models.ManyToManyField("seed.PropertyView")
+
+    message = models.JSONField(default=dict, blank=True, null=True)
+
+
+class OrderSettings(models.Model):
+    organization = models.OneToOneField(Organization, on_delete=models.CASCADE)
+    cycle = models.ForeignKey(Cycle, on_delete=models.SET_NULL, blank=True, null=True)
+    dq = models.ForeignKey(DataQualityCheck, on_delete=models.SET_NULL, blank=True, null=True)
+
+    label_not_paid = models.ForeignKey(StatusLabel, on_delete=models.SET_NULL, blank=True, null=True, related_name="order_settings_not_paid")
+    label_paid = models.ForeignKey(StatusLabel, on_delete=models.SET_NULL, blank=True, null=True, related_name="order_settings_paid")
+    excluded_status = models.ForeignKey(DataQualityStatus, on_delete=models.SET_NULL, blank=True, null=True)
+
+    building_id = models.ForeignKey(Column, on_delete=models.SET_NULL, blank=True, null=True, related_name="order_settings_as_building_id")
+    address_line_1 = models.ForeignKey(Column, on_delete=models.SET_NULL, blank=True, null=True, related_name="order_settings_as_address_line_1")
+    address_line_2 = models.ForeignKey(Column, on_delete=models.SET_NULL, blank=True, null=True, related_name="order_settings_as_address_line_2")
+    city = models.ForeignKey(Column, on_delete=models.SET_NULL, blank=True, null=True, related_name="order_settings_as_city")
+    state = models.ForeignKey(Column, on_delete=models.SET_NULL, blank=True, null=True, related_name="order_settings_as_state")
+    zip = models.ForeignKey(Column, on_delete=models.SET_NULL, blank=True, null=True, related_name="order_settings_as_zip")
+
+    # todo add options for customizing text
+

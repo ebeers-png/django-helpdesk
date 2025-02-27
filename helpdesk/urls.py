@@ -200,6 +200,8 @@ urlpatterns = [
     url(r'^email_template/edit/(?P<id>[0-9]+)/$', staff.email_template_edit, name='email_template_edit'),
     url(r'^email_template/default/(?P<id>[0-9]+)/$', staff.email_template_default, name='email_template_default'),
 
+    url(r'^payment/settings/$', staff.payment_settings,  name='payment_settings'),
+
     url(r'^preview_html$', staff.preview_html, name="preview_html"),
 
     url(r'^timeline_ticket_list/(?P<query>{})$'.format(base64_pattern),
@@ -280,6 +282,19 @@ urlpatterns += [
     url(r'^bps_pathway_calculator/$',
         public.bps_pathway_calculator,
         name='public_bps_pathway_calculator'),
+
+    url(r'^payment/$',
+        public.BuildingOrderView.as_view(),
+        name='payment'),
+
+    url(r'^payment/property/$',
+        public.lookup_building_for_payment,
+        name='lookup_building_for_payment'),
+
+    url(r'^payment/complete/$', public.payment_complete, name='payment_complete'),
+    url(r'^payment/canceled/$', public.payment_failed, name='payment_canceled'),
+    url(r'^payment/failed/$', public.payment_failed, name='payment_failed'),
+    url(r'^payment/duplicate/$', public.payment_failed, name='payment_duplicate'),
 ]
 
 urlpatterns += [

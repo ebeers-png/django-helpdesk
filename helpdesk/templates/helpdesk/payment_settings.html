@@ -1,0 +1,163 @@
+{% extends "helpdesk/base.html" %}{% load i18n %}
+
+{% block helpdesk_title %}{% trans "Payment Portal Settings" %}{% endblock %}
+
+{% block helpdesk_breadcrumb %}
+<li class="breadcrumb-item">
+    <a href="{% url 'helpdesk:system_settings' %}">{% trans "System Settings" %}</a>
+</li>
+<li class="breadcrumb-item active">
+    Payment Portal Settings
+</li>
+{% endblock %}
+
+{% block helpdesk_body %}{% blocktrans %}
+<h2>Payment Portal Settings</h2>
+<p>Here you can update the settings for your payment portal.</p>{% endblocktrans %}
+
+<form method='post' action='.' name="payment_settings_form">
+    {% csrf_token %}
+    <div class="order-settings card m-2">
+        <div class="card-body">
+
+            <div class="form-group">
+                <label for="cycle_select">Select the cycle that users will be paying for:</label>
+                <div>
+                    <select class="form-control" id="cycle_select" name="cycle">
+                        {% for cycle in cycle_options %}
+                      <option {% if order_settings.cycle.id == cycle.id %}selected{% endif %} value="{{ cycle.id }}">{{ cycle.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+              </div>
+
+            <div class="form-group">
+                <label for="dq_select">Select the data quality check to reference:</label>
+                <div>
+                    <select class="form-control" id="dq_select" name="dq">
+                        {% for dq in dq_options %}
+                      <option {% if order_settings.dq.id == dq.id %}selected{% endif %} value="{{ dq.id }}">{{ dq.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+              </div>
+            <div class="form-group">
+                <label for="excluded_status_select">Select the data quality status to exclude:</label>
+                <div>
+                    <select class="form-control" id="excluded_status_select" name="excluded_status">
+                        {% for status in dq_status_options %}
+                      <option {% if order_settings.excluded_status.id == status.id %}selected{% endif %} value="{{ status.id }}">{{ status.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="unpaid_select">Select the label for unpaid properties:</label>
+                <div>
+                    <select class="form-control" id="unpaid_select" name="label_not_paid">
+                        {% for label in label_options %}
+                      <option {% if order_settings.label_not_paid.id == label.id %}selected{% endif %} value="{{ label.id }}">{{ label.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+            <div class="form-group">
+                <label for="paid_select">Select the label for paid properties:</label>
+                <div>
+                    <select class="form-control" id="paid_select" name="label_paid">
+                        {% for label in label_options %}
+                      <option {% if order_settings.label_paid.id == label.id %}selected{% endif %} value="{{ label.id }}">{{ label.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="building_id">Select the column to use as the building's ID:</label>
+                <div>
+                    <input class="form-control" id="building_id" name="building_id_col" list=building-id placeholder="Start typing to search..."
+                           value="{% if order_settings.building_id %}{{ order_settings.building_id.display_name }} - {{ order_settings.building_id.column_name }} ({{ order_settings.building_id.id }}){% endif %}">
+                    <datalist id=building-id>
+                        {% for col in column_options %}
+                      <option>{{ col.display_name }} - {{ col.column_name }} ({{ col.id }})</option>
+                        {% endfor %}
+                    </datalist>
+                </div>
+            </div>
+
+            <p class="card-title">Once the user has entered their building ID, the following fields will be auto-filled in with data from these columns.</p>
+            <div class="form-group row">
+                <label class="col-sm-2" for="address_line_1">Address Line 1 Column</label>
+                <div class="col-sm-10">
+                    <input class="form-control" id="address_line_1" name="address_line_1_col" list=address_line_1_list placeholder="Start typing to search..."
+                           value="{% if order_settings.address_line_1 %}{{ order_settings.address_line_1.display_name }} - {{ order_settings.address_line_1.column_name }} ({{ order_settings.address_line_1.id }}){% endif %}">
+                    <datalist id=address_line_1_list>
+                        {% for col in column_options %}
+                      <option>{{ col.display_name }} - {{ col.column_name }} ({{ col.id }})</option>
+                        {% endfor %}
+                    </datalist>
+                </div>
+            </div>
+            <div class="form-group row">
+                <label class="col-sm-2" for="address_line_2">Address Line 2 Column</label>
+                <div class="col-sm-10">
+                    <input class="form-control" id="address_line_2" name="address_line_2_col" list=address_line_2_list placeholder="Start typing to search..."
+                           value="{% if order_settings.address_line_2 %}{{ order_settings.address_line_2.display_name }} - {{ order_settings.address_line_2.column_name }} ({{ order_settings.address_line_2.id }}){% endif %}">
+                    <datalist id=address_line_2_list>
+                        {% for col in column_options %}
+                      <option>{{ col.display_name }} - {{ col.column_name }} ({{ col.id }})</option>
+                        {% endfor %}
+                    </datalist>
+                </div>
+            </div>
+
+            <div class="form-group row">
+                <label class="col-sm-2" for="city">City Column</label>
+                <div class="col-sm-10">
+                    <input class="form-control" id="city" name="city_col" list=city_list placeholder="Start typing to search..."
+                           value="{% if order_settings.city %}{{ order_settings.city.display_name }} - {{ order_settings.city.column_name }} ({{ order_settings.city.id }}){% endif %}">
+                    <datalist id=city_list>
+                        {% for col in column_options %}
+                      <option>{{ col.display_name }} - {{ col.column_name }} ({{ col.id }})</option>
+                        {% endfor %}
+                    </datalist>
+                </div>
+            </div>
+
+            <div class="form-group row">
+                <label class="col-sm-2" for="state">State Column</label>
+                <div class="col-sm-10">
+                    <input class="form-control" id="state" name="state_col" list=state_list placeholder="Start typing to search..."
+                           value="{% if order_settings.state %}{{ order_settings.state.display_name }} - {{ order_settings.state.column_name }} ({{ order_settings.state.id }}){% endif %}">
+                    <datalist id=state_list>
+                        {% for col in column_options %}
+                      <option>{{ col.display_name }} - {{ col.column_name }} ({{ col.id }})</option>
+                        {% endfor %}
+                    </datalist>
+                </div>
+            </div>
+
+            <div class="form-group row">
+                <label class="col-sm-2" for="zip">Zip Code Column</label>
+                <div class="col-sm-10">
+                    <input class="form-control" id="zip" name="zip_col" list=zip_list placeholder="Start typing to search..."
+                           value="{% if order_settings.zip %}{{ order_settings.zip.display_name }} - {{ order_settings.zip.column_name }} ({{ order_settings.zip.id }}){% endif %}">
+                    <datalist id=zip_list>
+                        {% for col in column_options %}
+                      <option>{{ col.display_name }} - {{ col.column_name }} ({{ col.id }})</option>
+                        {% endfor %}
+                    </datalist>
+                </div>
+            </div>
+            <div class="form-group row">
+                <div class="col-sm-10">
+                  <button type="submit" class="btn btn-primary">Save</button>
+                    {% if status %}{{ status }}{% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</form>
+
+{% endblock %}
