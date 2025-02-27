@@ -10,12 +10,16 @@ import logging
 from csv import DictReader
 from os.path import join
 from importlib import import_module
+
+import requests
 from django.core.exceptions import (
     ObjectDoesNotExist, PermissionDenied, ImproperlyConfigured,
 )
+from rest_framework import status
 from django.urls import reverse
 from django.http import HttpResponseRedirect, JsonResponse
-from django.shortcuts import render, get_object_or_404
+from django.shortcuts import render, get_object_or_404, redirect
+from django.urls import reverse_lazy
 from django.utils.http import urlquote
 from django.utils.translation import ugettext as _
 from django.conf import settings
@@ -25,13 +29,17 @@ from django.views.generic.base import TemplateView
 from django.views.generic.edit import FormView
 from django.db.models import Q
 
+from helpdesk.forms import OrderForm
 from helpdesk import settings as helpdesk_settings
 from helpdesk.decorators import protect_view, is_helpdesk_staff
 import helpdesk.views.staff as staff
 import helpdesk.views.abstract_views as abstract_views
 from helpdesk.lib import find_beam_view, text_is_spam
-from helpdesk.models import Ticket, UserSettings, CustomField, FormType, TicketCC, is_extra_data, is_unlisted
+from helpdesk.models import Ticket, UserSettings, CustomField, FormType, TicketCC, is_extra_data, is_unlisted, \
+    OrderSettings, Order, PAYMENT_TYPE, PAYMENT_STATUS
 from helpdesk.user import huser_from_request
+from seed.lib.superperms.orgs.models import Organization
+from seed.models import PropertyState, PropertyView, DataQualityResults
 
 logger = logging.getLogger(__name__)
 
@@ -335,6 +343,7 @@ def view_ticket(request):
         'debug': settings.DEBUG,
     })
 
+
 def evaluate_derived_column(request):
     building_id = request.POST.get('building_id', None)
     form_id = request.POST.get("form_id", None)
@@ -384,3 +393,307 @@ def change_language(request):
         return_to = request.GET['return_to']
 
     return render(request, 'helpdesk/public_change_language.html', {'next': return_to, 'debug': settings.DEBUG})
+
+
+def _mark_buildings_paid(order, order_settings):
+    paid_label = order_settings.label_paid
+    unpaid_label = order_settings.label_not_paid
+    for p in order.properties.all():
+        p.labels.remove(unpaid_label)
+        p.labels.add(paid_label)
+
+
+class BuildingOrderView(TemplateView):
+    template_name = "helpdesk/payment.html"
+
+    def get(self, *args, **kwargs):
+        # Create an instance of the formset
+        order_form = OrderForm()
+        return self.render_to_response({
+            'order_form': order_form
+        })
+
+    def post(self, *args, **kwargs):
+        """Submit the order for the user."""
+        org_id = self.request.POST.get("org_id", None)
+        org = Organization.objects.get(id=org_id)
+        payment_type = self.request.POST.get("payment_type", "cc")
+        state_ids = self.request.POST.getlist("state_id", [])
+
+        order_form = OrderForm(data=self.request.POST)
+
+        # Check if submitted forms are valid
+        if order_form.is_valid():
+            # Create the order object
+            order = order_form.save(commit=False)
+            order.organization = org
+            order.payment_type = PAYMENT_TYPE.cc if payment_type == 'cc' else PAYMENT_TYPE.ach
+            order.save()
+            property_views = PropertyView.objects.filter(  # todo check that they are payable
+                cycle=org.ordersettings.cycle,
+                state__id__in=state_ids,
+                property__organization=org)
+            order.properties.set(property_views)
+
+            # Send payment to checkout page, and then redirect user to the checkout.
+            response = _prepare_payment(self.request, order, org.ordersettings)
+            data = response.json()
+
+            if response.status_code != 200:
+                # todo need to catch this properly
+                print(data)
+                return self.render_to_response({'order_form': order_form})
+
+            order.token = data['token']
+            order.save()
+            return HttpResponseRedirect(data['htmL5RedirectUrl'])
+
+        return self.render_to_response({'order_form': order_form})
+
+
+def _get_field(p, field):
+    if field.is_extra_data:
+        return getattr(p.extra_data, field.column_name, "")
+    else:
+        return getattr(p, field.column_name, "")
+
+
+def _check_order(order):
+    """
+    Look up order using the order's token.
+    """
+    url = f'https://securecheckout-uat.cdc.nicusa.com/ccprest/api/v1/co/tokens/{order.token}'
+    merchant_code = settings.PAYMENT_MERCHANT_CODE_SECRET
+    merchant_key = settings.PAYMENT_MERCHANT_KEY_SECRET
+    api_key = settings.PAYMENT_API_KEY
+
+    headers = {
+        "MerchantCode": merchant_code,
+        "MerchantKey": merchant_key,
+        "ApiKey": api_key
+    }
+    response = requests.get(url, headers=headers)
+    data = response.json()
+    return data
+
+
+def lookup_building_for_payment(request):
+    if request.is_ajax and request.method == "GET":
+        org_id = request.GET.get("org", None)
+        building_id = request.GET.get('id', None)
+        org_settings = OrderSettings.objects.get(organization_id=org_id)
+
+        # look up the building
+        building_id_col = org_settings.building_id
+        try:
+            if building_id_col.is_extra_data:
+                building = PropertyState.objects.get(**{
+                    f'extra_data__{building_id_col.column_name}': building_id,
+                    "propertyview__cycle": org_settings.cycle,
+                    "organization": org_settings.organization
+                })
+            else:
+                building = PropertyState.objects.get(**{
+                    building_id_col.column_name: building_id,
+                    "propertyview__cycle": org_settings.cycle,
+                    "organization": org_settings.organization
+                })
+        except PropertyState.DoesNotExist:
+            return JsonResponse({
+                "status": "error",
+                "message": "Building not found. Please ensure your ID is correct."
+            }, status=status.HTTP_404_NOT_FOUND)
+
+        # check whether building can be paid for
+        if Order.objects.filter(payment_status=PAYMENT_STATUS.pending, properties=building.propertyview_set.first()):
+            # building is in someone's cart and has not been released yet
+            return JsonResponse({
+                "status": "error",
+                "message": "Building cannot be paid for at this time."
+            }, status=status.HTTP_404_NOT_FOUND)
+
+        if not building.propertyview_set.first().labels.filter(id=org_settings.label_not_paid.id).exists():
+            if building.propertyview_set.first().labels.filter(id=org_settings.label_paid.id).exists():
+                # building has a "paid" label
+                return JsonResponse({
+                    "status": "error",
+                    "message": "This building has already been paid for."
+                }, status=status.HTTP_404_NOT_FOUND)
+
+            dq_result = DataQualityResults.objects.filter(property_state=building, data_quality=org_settings.dq).order_by('-created').first()
+            if dq_result.status is org_settings.excluded_status:
+                # building has a "not paid" label, but it's excluded
+                return JsonResponse({
+                    "status": "error",
+                    "message": "This building is not covered and does not need to be paid for."
+                }, status=status.HTTP_404_NOT_FOUND)
+
+            # building must have a "not paid" label
+            return JsonResponse({
+                "status": "error",
+                "message": "Building not found. Please ensure your ID is correct."
+            }, status=status.HTTP_404_NOT_FOUND)
+
+        # return autofill information
+        cols = {
+            'address_line_1': org_settings.address_line_1,
+            'address_line_2': org_settings.address_line_2,
+            'city': org_settings.city,
+            'state': org_settings.state,
+            'zip': org_settings.zip,
+        }
+
+        data = {}
+        for field, col in cols.items():
+            data[field] = _get_field(building, col)
+
+        data['_state_id'] = building.id
+        return JsonResponse({
+            "status": "success",
+            "data": data
+        })
+
+
+def _prepare_payment(request, order, order_settings):
+    """
+    Creates the order and sends the order off to the checkout page.
+    """
+    url = 'https://securecheckout-uat.cdc.nicusa.com/ccprest/api/v1/co/tokens'
+    merchant_code = settings.PAYMENT_MERCHANT_CODE_SECRET
+    merchant_key = settings.PAYMENT_MERCHANT_KEY_SECRET
+    service_code_cc = settings.PAYMENT_SERVICE_CODE_CC
+    service_code_ach = settings.PAYMENT_SERVICE_CODE_ACH
+    api_key = settings.PAYMENT_API_KEY
+
+    data = {
+        "OrderTotal": order.properties.all().count() * 100.00,
+        "MerchantCode": merchant_code,
+        "MerchantKey": merchant_key,
+        "ServiceCode": service_code_cc if order.payment_type == PAYMENT_TYPE.cc else service_code_ach,
+        "UniqueTransId": order.id,  # todo can be 1-32 characters
+        "LocalRef": "2025 Reporting Form",  # todo change based on cycle
+        "PaymentType": "CC" if order.payment_type == PAYMENT_TYPE.cc else 'ACH',
+        "SuccessUrl": request.build_absolute_uri(reverse('helpdesk:payment_complete') + "?org=" + order.organization.name),
+        "FailureUrl": request.build_absolute_uri(reverse('helpdesk:payment_failed') + "?org=" + order.organization.name),
+        "DuplicateUrl": request.build_absolute_uri(reverse('helpdesk:payment_duplicate') + "?org=" + order.organization.name),
+        "CancelUrl": request.build_absolute_uri(reverse('helpdesk:payment_canceled') + "?org=" + order.organization.name),
+        "Phone": None,
+        "Email": order.payer_email,
+        "BCCEmail1": None,
+        "BCCEmail2": None,
+        "BCCEmail3": None,
+        "CustomerId": None,
+        "CompanyName": order.payer_company,
+        "FinancialSessionId": None,
+        "CustomerAddress": {
+                "Name": f"{order.payer_first_name} {order.payer_last_name}",
+                "Address1": None,
+                "Address2": None,
+                "City": None,
+                "State": None,
+                "Zip": None,
+                "Country": "US"
+        },
+        "BillingAddress": None,
+        "OrderAttributes": None,
+        "LineItems": []
+    }
+    for p in order.properties.all():
+        data['LineItems'].append({
+            "Sku": "AcctRecv",
+            "Description": f"{_get_field(p.state, order_settings.building_id)}/{order.payer_first_name} {order.payer_last_name}",
+            "UnitPrice": 100.00,
+            "Quantity": 1,
+            "InstanceId": None,
+            "ItemAttributes": [{"FieldName": "VIEWID", "FieldValue": p.id}]
+        })
+
+    headers = {'ApiKey': api_key}
+    response = requests.post(
+        url,
+        json=data,
+        headers=headers)
+
+    return response
+
+
+def payment_complete(request):
+    """
+    Checks whether order was successful. If so, updates buildings and order's payment status.
+    """
+    message = "Your order could not be found. If you would like to check the status of your payment, please contact our Help Center."
+    token = request.GET.get('token', None)
+    org = request.GET.get('org', None)
+    if not token:
+        return HttpResponseRedirect(reverse("helpdesk:home") + ("?org=" + org if org else ''))
+    try:
+        order = Order.objects.get(token=token)
+    except Order.DoesNotExist:
+        return render(request, 'helpdesk/payment_complete.html', {
+            'message': message,
+            'debug': settings.DEBUG,
+        })
+
+    data = _check_order(order)
+    if data['matchingOrders'] != 0:
+        for o in data['orders']:
+            if o['localRefId'] == '2025 Reporting Form' and o['orderStatus'] == 'COMPLETE':
+                order.payment_status = PAYMENT_STATUS.success
+                order.save()
+
+                ids = []  # update our record with the properties that were paid for
+                for item in o['items']:
+                    for field in item['itemAttributes']:
+                        if field['fieldName'] == 'VIEWID':
+                            ids.append(int(field['fieldValue']))
+                order.properties.set(ids)
+                _mark_buildings_paid(order, order.organization.ordersettings)
+                message = "Thank you for your payment!"  # todo add more to the message
+    else:
+        # todo if order was not completed correctly
+        return render(request, 'helpdesk/payment_failed.html', {
+            'debug': settings.DEBUG,
+        })
+
+    return render(request, 'helpdesk/payment_complete.html', {
+        'message': message,
+        'debug': settings.DEBUG,
+    })
+
+
+def payment_failed(request):
+    """
+    Handles all 'return' pages that aren't complete/success.
+    Update the order to allow someone else to pay for the building.
+    """
+    token = request.GET.get('token', None)
+    org = request.GET.get('org', None)
+    if not token:
+        return HttpResponseRedirect(reverse("helpdesk:home") + ("?org=" + org if org else ''))
+    try:
+        order = Order.objects.get(token=token)
+    except Order.DoesNotExist:
+        return render(request, 'helpdesk/payment_failed.html', {
+            'debug': settings.DEBUG,
+        })
+
+    data = _check_order(order)
+    if data['matchingOrders'] == 0:
+        order.payment_status = PAYMENT_STATUS.failed
+        order.save()
+
+    if 'duplicate' in request.path:
+        return render(request, 'helpdesk/payment_duplicate.html', {
+            'debug': settings.DEBUG,
+        })
+    if 'failed' in request.path:
+        return render(request, 'helpdesk/payment_failed.html', {
+            'debug': settings.DEBUG,
+        })
+    if 'canceled' in request.path:
+        return render(request, 'helpdesk/payment_canceled.html', {
+            'debug': settings.DEBUG,
+        })
+    return render(request, 'helpdesk/payment_failed.html', {
+        'debug': settings.DEBUG,
+    })

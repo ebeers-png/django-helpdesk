@@ -3,8 +3,10 @@ from django import forms
 from django.utils.translation import ugettext_lazy as _
 from django.utils.html import format_html
 from helpdesk.models import (
-    DependsOn, Queue, Ticket, FollowUp, TimeSpent, PreSetReply, KBCategory, EscalationExclusion, EmailTemplate, KBItem, TicketChange,
-    KBIAttachment, FollowUpAttachment, IgnoreEmail, CustomField, FormType, is_extra_data)
+    DependsOn, Queue, Ticket, FollowUp, TimeSpent, PreSetReply, KBCategory, EscalationExclusion, EmailTemplate, KBItem,
+    TicketChange,
+    KBIAttachment, FollowUpAttachment, IgnoreEmail, CustomField, FormType, is_extra_data, Order,
+    OrderSettings)
 from seed.models import Column, Property, TaxLot
 from seed.lib.superperms.orgs.models import get_helpdesk_organizations
 from pinax.teams.models import JoinInvitation, Membership, Team
@@ -284,3 +286,12 @@ class KBCategoryAdmin(admin.ModelAdmin):
 
 admin.site.register(PreSetReply)
 admin.site.register(EscalationExclusion)
+
+admin.site.register(OrderSettings)
+
+
+@admin.register(Order)
+class OrderAdmin(admin.ModelAdmin):
+    list_display = ('__str__', 'payment_status', 'token_created', 'organization', )
+    list_filter = ('payment_status', 'organization', )
+    readonly_fields = [f.name for f in Order._meta.get_fields()]

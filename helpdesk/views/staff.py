@@ -61,7 +61,7 @@ from helpdesk.lib import (
 from helpdesk.models import (
     DependsOn, Ticket, Queue, FollowUp, TimeSpent, TicketChange, PreSetReply, FollowUpAttachment, SavedSearch,
     IgnoreEmail, TicketCC, TicketDependency, UserSettings, KBItem, CustomField, is_unlisted,
-    FormType, EmailTemplate, get_markdown, clean_html, Tag
+    FormType, EmailTemplate, get_markdown, clean_html, Tag, OrderSettings
 )
 
 from helpdesk import settings as helpdesk_settings
@@ -76,7 +76,7 @@ from datetime import timedelta, datetime
 
 from ..templated_email import send_templated_mail
 
-from seed.models import PropertyView, Property, TaxLotView, TaxLot, Column
+from seed.models import PropertyView, Property, TaxLotView, TaxLot, Column, Cycle, DataQualityCheck, DataQualityStatus, StatusLabel
 from post_office.models import STATUS, Email
 from urllib.parse import urlparse, urlunparse
 from django.http import QueryDict
@@ -3879,3 +3879,62 @@ def export(qs, org, serializer, paginate=False, do_extra_data=True, visible_cols
         response['Content-Disposition'] = 'attachment; filename=' + file_name
         response['Content-Type'] = 'application/vnd.ms-excel; charset=utf-16'
         return response
+
+
+@helpdesk_staff_member_required
+def payment_settings(request):
+    """Updates settings for the organization's payment portal page."""
+    org = request.user.default_organization.helpdesk_organization
+    update_status = None
+
+    if request.method == 'POST':  # todo change to PUT?
+        order_settings = OrderSettings.objects.filter(organization=org)
+
+        cycle = Cycle.objects.get(organization=org, id=request.POST.get('cycle', None))
+        dq = DataQualityCheck.objects.get(organization=org, id=request.POST.get('dq', None))
+        excluded_status = DataQualityStatus.objects.get(organization=org, id=request.POST.get('excluded_status', None))
+        label_not_paid = StatusLabel.objects.get(super_organization=org, id=request.POST.get('label_not_paid', None))
+        label_paid = StatusLabel.objects.get(super_organization=org, id=request.POST.get('label_paid', None))
+
+        col_re = re.compile(r'\(([0-9]+)\)$')
+        cols = {
+            'cycle_id': cycle.id,
+            'dq_id': dq.id,
+            'excluded_status_id': excluded_status.id,
+            'label_not_paid_id': label_not_paid.id,
+            'label_paid_id': label_paid.id,
+        }
+        for key, attr in request.POST.items():
+            if key.endswith('_col'):
+                match = col_re.search(attr)
+                if match:
+                    col_id = match.group(1)
+                    cols[key[:-4]] = Column.objects.get(organization=org, table_name='PropertyState', id=col_id)
+                else:
+                    cols[key[:-4]] = None
+        order_settings.update(**cols)
+        update_status = 'Your settings have been saved.'
+
+    order_settings, _ = OrderSettings.objects.get_or_create(organization=org)
+    cycle_options = Cycle.objects.filter(organization=org).values('name', 'id')
+    dq_options = DataQualityCheck.objects.filter(organization=org).values('name', 'id')
+    dq_status_options = DataQualityStatus.objects.filter(organization=org).values('name', 'id')
+    label_options = StatusLabel.objects.filter(super_organization=org).values('name', 'id')
+    column_options = Column.objects.filter(
+        organization=org,
+        table_name='PropertyState'
+    ).values('column_name', 'display_name', 'id')
+
+    return render(request, 'helpdesk/payment_settings.html', {
+        'status': update_status,
+        'order_settings': order_settings,
+        'cycle_options': cycle_options,
+        'column_options': column_options,
+        'dq_options': dq_options,
+        'dq_status_options': dq_status_options,
+        'label_options': label_options,
+        'debug': settings.DEBUG,
+    })
+
+
+payment_settings = helpdesk_staff_member_required(payment_settings)

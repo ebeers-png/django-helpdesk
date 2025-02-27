@@ -1,0 +1,12 @@
+{% extends "helpdesk/public_base.html" %}{% load i18n %}{% load organization_info %}{% organization_info user request as user_info %}
+
+{% load i18n bootstrap4form %}
+
+{% block helpdesk_title %}{% blocktrans %}Payment Portal{% endblocktrans %}{% endblock %}
+
+{% block helpdesk_body %}
+<h2>{% trans "Payment Portal" %}</h2>
+
+Your payment failed to process. To return to the payment portal, please click <a href="{% url 'helpdesk:payment' %}{{ user_info.url }}">here</a>.
+
+{% endblock %}
