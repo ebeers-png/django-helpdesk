@@ -503,6 +503,11 @@ def lookup_building_for_payment(request):
                 "status": "error",
                 "message": "Building not found. Please ensure your ID is correct."
             }, status=status.HTTP_404_NOT_FOUND)
+        except PropertyState.MultipleObjectsReturned:
+            return JsonResponse({
+                "status": "error",
+                "message": "Building not found. Please ask your admin to ensure there are no duplicates of your building in the database."
+            }, status=status.HTTP_404_NOT_FOUND)
 
         # check whether building can be paid for
         if Order.objects.filter(payment_status=PAYMENT_STATUS.pending, properties=building.propertyview_set.first()):
