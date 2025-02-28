@@ -2362,6 +2362,7 @@ class OrderSettings(models.Model):
     payment_status = models.ForeignKey(Column, on_delete=models.SET_NULL, blank=True, null=True, related_name="order_settings_as_payment_status")
 
     building_id = models.ForeignKey(Column, on_delete=models.SET_NULL, blank=True, null=True, related_name="order_settings_as_building_id")
+    building_name = models.ForeignKey(Column, on_delete=models.SET_NULL, blank=True, null=True, related_name="order_settings_as_building_name")
     address_line_1 = models.ForeignKey(Column, on_delete=models.SET_NULL, blank=True, null=True, related_name="order_settings_as_address_line_1")
     address_line_2 = models.ForeignKey(Column, on_delete=models.SET_NULL, blank=True, null=True, related_name="order_settings_as_address_line_2")
     city = models.ForeignKey(Column, on_delete=models.SET_NULL, blank=True, null=True, related_name="order_settings_as_city")

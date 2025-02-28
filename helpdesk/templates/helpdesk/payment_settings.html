@@ -80,6 +80,18 @@
 
             <p class="card-title">Once the user has entered their building ID, the following fields will be auto-filled in with data from these columns.</p>
             <div class="form-group row">
+                <label class="col-sm-2" for="building_name">Building Name Column</label>
+                <div class="col-sm-10">
+                    <input class="form-control" id="building_name" name="building_name_col" list=building_name_list placeholder="Start typing to search..."
+                           value="{% if order_settings.building_name %}{{ order_settings.building_name.display_name }} - {{ order_settings.building_name.column_name }} ({{ order_settings.building_name.id }}){% endif %}">
+                    <datalist id=building_name_list>
+                        {% for col in column_options %}
+                      <option>{{ col.display_name }} - {{ col.column_name }} ({{ col.id }})</option>
+                        {% endfor %}
+                    </datalist>
+                </div>
+            </div>
+            <div class="form-group row">
                 <label class="col-sm-2" for="address_line_1">Address Line 1 Column</label>
                 <div class="col-sm-10">
                     <input class="form-control" id="address_line_1" name="address_line_1_col" list=address_line_1_list placeholder="Start typing to search..."

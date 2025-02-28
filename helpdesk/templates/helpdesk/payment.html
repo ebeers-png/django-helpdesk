@@ -42,25 +42,25 @@
         </div>
     </div>
     <div class="m-2">
-    <p>Please select your Building ID below. If you don't find your building's information listed in the tool,
+    <p>Please select your Colorado Building ID below. If you don't find your building's information listed in the tool,
         you can look up your building information using this <a href="https://co.beam-portal.org/helpdesk/kb/trainings/32/?org=Building%20Performance%20Colorado">Building ID Lookup Tool</a>.<br>
         If you don't find your building's information listed in the tool, please submit a <a href="https://co.beam-portal.org/helpdesk/tickets/submit/31/?org=Building%20Performance%20Colorado">ticket</a> via the Building Performance Colorado Help Center to be assigned a Colorado Building ID.
         </p>
-    <p style="color:red;"><b>If you make a payment to the wrong Building ID or Building Address, this cannot be resolved until the end of the reporting season and may affect a building's compliance status. Please ensure correctness before submitting.</b></p>
+    <p style="color:red;"><b>If you make a payment to the wrong Colorado Building ID or Building Address, this cannot be resolved until the end of the reporting season and may affect a building's compliance status. Please ensure correctness before submitting.</b></p>
     <p>If you are paying the annual fee for multiple buildings, please use the <b>"Add Building"</b> button at the bottom of the page to add additional buildings.</p>
     </div>
     <div class="building-form card m-2" id="id_form-0-form">
         <h5 class="card-header">
-            <span class="float-left">Building ID & Address</span>
+            <span class="float-left">Colorado Building ID & Address</span>
             <span class="float-right"><button class="btn btn-danger" type="button" id="form-0-remove" value="0">Remove</button></span> </h5>
         <div class="card-body">
 
             <div class="form-row">
                 <div class="form-group col-md-6 needs-validation">
-                    <label>Building ID</label>
+                    <label>Colorado Building ID</label>
                     <div class="input-group mb-3">
                       <input type="hidden" id="id_form-0-id" name="state_id" value="">
-                      <input type="text" class="form-control" id="form-0-autofill-value" name="building_id" value="" placeholder="Building ID" aria-label="Building ID" aria-describedby="button-addon2">
+                      <input type="text" class="form-control" id="form-0-autofill-value" name="building_id" value="" placeholder="Colorado Building ID" aria-label="Colorado Building ID" aria-describedby="button-addon2">
                       <div class="input-group-append">
                         <button class="btn btn-outline-secondary autofill-btn" type="button" id="form-0-autofill" value="0">Search</button>
                     </div>
@@ -70,8 +70,8 @@
                   </div>
                 </div>
                 <div class="form-group col-md-6 disabled">
-                    <label for="id_form-0-name">Building Name</label>
-                    <p class="form-0-p form-control" style="background-color:#e7ebee;" id="id_form-0-name"></p>
+                    <label for="id_form-0-building_name">Building Name</label>
+                    <p class="form-0-p form-control" style="background-color:#e7ebee;" id="id_form-0-building_name"></p>
                 </div>
             </div>
 
@@ -214,6 +214,7 @@
             success: function(response) {
                 let data = response.data;
                 $(`#id_form-${formId}-id`).val(data._state_id);
+                $(`#id_form-${formId}-building_name`).text(data.building_name);
                 $(`#id_form-${formId}-address_line_1`).text(data.address_line_1);
                 $(`#id_form-${formId}-address_line_2`).text(data.address_line_2);
                 $(`#id_form-${formId}-city`).text(data.city);
@@ -226,6 +227,7 @@
             },
             error: function(xhr, status, error) {
                 $(`#id_form-${formId}-id`).val('');
+                $(`#id_form-${formId}-building_name`).text('');
                 $(`#id_form-${formId}-address_line_1`).text('');
                 $(`#id_form-${formId}-address_line_2`).text('');
                 $(`#id_form-${formId}-city`).text('');
