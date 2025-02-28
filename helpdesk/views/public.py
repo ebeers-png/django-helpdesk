@@ -541,6 +541,7 @@ def lookup_building_for_payment(request):
 
         # return autofill information
         cols = {
+            'building_name': org_settings.building_name,
             'address_line_1': org_settings.address_line_1,
             'address_line_2': org_settings.address_line_2,
             'city': org_settings.city,
