@@ -67,6 +67,13 @@
         {% endif %}
         {% if user_info.default_org.name == 'Building Performance Colorado' %}
         <li class="nav-item">
+          <a class="nav-link" href="{% url 'helpdesk:payment' %}">
+            <i class="fas fa-money-check"></i>
+            <span>{% trans "Payment Portal" %}</span>
+          </a>
+        </li>
+
+        <li class="nav-item">
           <a class="nav-link" href="https://energyoffice.colorado.gov/accessibility"  target="_blank">
             <i class="fas fa-fw fa-universal-access"></i>
             <span>{% trans "Accessibility Notice" %}</span>
@@ -134,6 +141,13 @@
         </li>
         {% endif %}
         {% if user_info.default_org.name == 'Building Performance Colorado' %}
+        <li class="nav-item">
+          <a class="nav-link" href="{% url 'helpdesk:payment' %}{{ user_info.url }}">
+            <i class="fas fa-money-check"></i>
+            <span>{% trans "Payment Portal" %}</span>
+          </a>
+        </li>
+
         <li class="nav-item">
           <a class="nav-link" href="https://energyoffice.colorado.gov/accessibility"  target="_blank">
             <i class="fas fa-fw fa-universal-access"></i>
