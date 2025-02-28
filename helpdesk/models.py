@@ -1262,6 +1262,22 @@ class KBIAttachment(Attachment):
             if not os.path.exists(att_path):
                 os.makedirs(att_path, 0o777)
         return os.path.join(path, filename)
+    
+    def delete(self, *args, **kwargs):
+        if settings.DEFAULT_FILE_STORAGE == "django.core.files.storage.FileSystemStorage":
+            if self.file and os.path.isfile(self.file.path):
+                os.remove(self.file.path)
+            
+            # Optionally remove the directory if it's empty
+            directory = os.path.dirname(self.file.path)
+            if os.path.exists(directory) and not os.listdir(directory):
+                os.rmdir(directory)
+        else:
+            # For other storage backends, use the default storage API
+            if self.file:
+                self.file.delete(save=False)
+
+        super().delete(*args, **kwargs)
 
 
 class PreSetReply(models.Model):
