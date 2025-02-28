@@ -224,6 +224,9 @@ def map_form_fields_to_state_data(state_data, form_id, inventory_type):
             if f.column.column_name and hasattr(f.column, 'is_extra_data') and f.column.table_name:
                 if f.column.is_extra_data and f.column.column_name in state_data['extra_data']:
                     value = state_data['extra_data'][f.column.column_name]
+                elif hasattr(f.column, 'derived_column') \
+                    and 'derived_data' in state_data and f.column.column_name in state_data['derived_data']:
+                    value = state_data['derived_data'][f.column.column_name]
                 elif not f.column.is_extra_data and f.column.column_name in state_data:
                     value = state_data[f.column.column_name]
             
