@@ -2358,9 +2358,8 @@ class OrderSettings(models.Model):
     cycle = models.ForeignKey(Cycle, on_delete=models.SET_NULL, blank=True, null=True)
     dq = models.ForeignKey(DataQualityCheck, on_delete=models.SET_NULL, blank=True, null=True)
 
-    label_not_paid = models.ForeignKey(StatusLabel, on_delete=models.SET_NULL, blank=True, null=True, related_name="order_settings_not_paid")
-    label_paid = models.ForeignKey(StatusLabel, on_delete=models.SET_NULL, blank=True, null=True, related_name="order_settings_paid")
     excluded_status = models.ForeignKey(DataQualityStatus, on_delete=models.SET_NULL, blank=True, null=True)
+    payment_status = models.ForeignKey(Column, on_delete=models.SET_NULL, blank=True, null=True, related_name="order_settings_as_payment_status")
 
     building_id = models.ForeignKey(Column, on_delete=models.SET_NULL, blank=True, null=True, related_name="order_settings_as_building_id")
     address_line_1 = models.ForeignKey(Column, on_delete=models.SET_NULL, blank=True, null=True, related_name="order_settings_as_address_line_1")

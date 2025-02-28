@@ -3893,16 +3893,12 @@ def payment_settings(request):
         cycle = Cycle.objects.get(organization=org, id=request.POST.get('cycle', None))
         dq = DataQualityCheck.objects.get(organization=org, id=request.POST.get('dq', None))
         excluded_status = DataQualityStatus.objects.get(organization=org, id=request.POST.get('excluded_status', None))
-        label_not_paid = StatusLabel.objects.get(super_organization=org, id=request.POST.get('label_not_paid', None))
-        label_paid = StatusLabel.objects.get(super_organization=org, id=request.POST.get('label_paid', None))
 
         col_re = re.compile(r'\(([0-9]+)\)$')
         cols = {
             'cycle_id': cycle.id,
             'dq_id': dq.id,
             'excluded_status_id': excluded_status.id,
-            'label_not_paid_id': label_not_paid.id,
-            'label_paid_id': label_paid.id,
         }
         for key, attr in request.POST.items():
             if key.endswith('_col'):

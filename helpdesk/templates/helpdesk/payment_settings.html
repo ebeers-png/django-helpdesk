@@ -53,23 +53,15 @@
             </div>
 
             <div class="form-group">
-                <label for="unpaid_select">Select the label for unpaid properties:</label>
+                <label for="payment_status">Select the column to use for the building's payment status:</label>
                 <div>
-                    <select class="form-control" id="unpaid_select" name="label_not_paid">
-                        {% for label in label_options %}
-                      <option {% if order_settings.label_not_paid.id == label.id %}selected{% endif %} value="{{ label.id }}">{{ label.name }}</option>
+                    <input class="form-control" id="payment_status" name="payment_status_col" list=payment-status placeholder="Start typing to search..."
+                           value="{% if order_settings.payment_status %}{{ order_settings.payment_status.display_name }} - {{ order_settings.payment_status.column_name }} ({{ order_settings.payment_status.id }}){% endif %}">
+                    <datalist id=payment-status>
+                        {% for col in column_options %}
+                      <option>{{ col.display_name }} - {{ col.column_name }} ({{ col.id }})</option>
                         {% endfor %}
-                    </select>
-                </div>
-            </div>
-            <div class="form-group">
-                <label for="paid_select">Select the label for paid properties:</label>
-                <div>
-                    <select class="form-control" id="paid_select" name="label_paid">
-                        {% for label in label_options %}
-                      <option {% if order_settings.label_paid.id == label.id %}selected{% endif %} value="{{ label.id }}">{{ label.name }}</option>
-                        {% endfor %}
-                    </select>
+                    </datalist>
                 </div>
             </div>
 

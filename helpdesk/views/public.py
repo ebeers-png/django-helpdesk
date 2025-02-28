@@ -16,6 +16,7 @@ import requests
 from django.core.exceptions import (
     ObjectDoesNotExist, PermissionDenied, ImproperlyConfigured,
 )
+from django.db import transaction
 from rest_framework import status
 from django.urls import reverse
 from django.http import HttpResponseRedirect, JsonResponse
@@ -397,11 +398,14 @@ def change_language(request):
 
 
 def _mark_buildings_paid(order, order_settings):
-    paid_label = order_settings.label_paid
-    unpaid_label = order_settings.label_not_paid
+    payment_status_column = order_settings.payment_status
+
     for p in order.properties.all():
-        p.labels.remove(unpaid_label)
-        p.labels.add(paid_label)
+        if payment_status_column.is_extra_data:
+            p.state.extra_data[payment_status_column.column_name] = "Paid - 2025"
+        else:
+            setattr(p.state, payment_status_column.column_name, "Paid - 2025")
+        p.state.save()
 
 
 class BuildingOrderView(TemplateView):
@@ -454,7 +458,7 @@ class BuildingOrderView(TemplateView):
 
 def _get_field(p, field):
     if field.is_extra_data:
-        return getattr(p.extra_data, field.column_name, "")
+        return p.extra_data[field.column_name] if field.column_name in p.extra_data else ""
     else:
         return getattr(p, field.column_name, "")
 
@@ -465,9 +469,9 @@ def _check_order(order):
     """
     url = f'https://securecheckout-uat.cdc.nicusa.com/ccprest/api/v1/co/tokens/{order.token}'
 
-    merchant_code = os.environ['PAYMENT_MERCHANT_CODE_SECRET']
-    merchant_key = os.environ['PAYMENT_MERCHANT_KEY_SECRET']
-    api_key = os.environ['PAYMENT_API_KEY']
+    merchant_code = settings.PAYMENT_MERCHANT_CODE_SECRET
+    merchant_key = settings.PAYMENT_MERCHANT_KEY_SECRET
+    api_key = settings.PAYMENT_API_KEY
 
     headers = {
         "MerchantCode": merchant_code,
@@ -519,26 +523,20 @@ def lookup_building_for_payment(request):
                 "message": "Building cannot be paid for at this time."
             }, status=status.HTTP_404_NOT_FOUND)
 
-        if not building.propertyview_set.first().labels.filter(id=org_settings.label_not_paid.id).exists():
-            if building.propertyview_set.first().labels.filter(id=org_settings.label_paid.id).exists():
-                # building has a "paid" label
-                return JsonResponse({
-                    "status": "error",
-                    "message": "This building has already been paid for."
-                }, status=status.HTTP_404_NOT_FOUND)
-
-            dq_result = DataQualityResults.objects.filter(property_state=building, data_quality=org_settings.dq).order_by('-created').first()
-            if dq_result.status is org_settings.excluded_status:
-                # building has a "not paid" label, but it's excluded
-                return JsonResponse({
-                    "status": "error",
-                    "message": "This building is not covered and does not need to be paid for."
-                }, status=status.HTTP_404_NOT_FOUND)
-
-            # building must have a "not paid" label
+        dq_result = DataQualityResults.objects.filter(property_state=building, data_quality=org_settings.dq).order_by('-created').first()
+        if dq_result.status is org_settings.excluded_status:
+            # building is excluded
             return JsonResponse({
                 "status": "error",
-                "message": "Building not found. Please ensure your ID is correct."
+                "message": "This building is not covered and does not need to be paid for."
+            }, status=status.HTTP_404_NOT_FOUND)
+
+        payment_status_column = org_settings.payment_status
+        if _get_field(building, payment_status_column) != "":
+            # building has been paid for
+            return JsonResponse({
+                "status": "error",
+                "message": "This building has already been paid for."
             }, status=status.HTTP_404_NOT_FOUND)
 
         # return autofill information
@@ -566,11 +564,11 @@ def _prepare_payment(request, order, order_settings):
     Creates the order and sends the order off to the checkout page.
     """
     url = 'https://securecheckout-uat.cdc.nicusa.com/ccprest/api/v1/co/tokens'
-    merchant_code = os.environ['PAYMENT_MERCHANT_CODE_SECRET']
-    merchant_key = os.environ['PAYMENT_MERCHANT_KEY_SECRET']
-    service_code_cc = os.environ['PAYMENT_SERVICE_CODE_CC']
-    service_code_ach = os.environ['PAYMENT_SERVICE_CODE_ACH']
-    api_key = os.environ['PAYMENT_API_KEY']
+    merchant_code = settings.PAYMENT_MERCHANT_CODE_SECRET
+    merchant_key = settings.PAYMENT_MERCHANT_KEY_SECRET
+    service_code_cc = settings.PAYMENT_SERVICE_CODE_CC
+    service_code_ach = settings.PAYMENT_SERVICE_CODE_ACH
+    api_key = settings.PAYMENT_API_KEY
 
     data = {
         "OrderTotal": order.properties.all().count() * 100.00,
@@ -645,16 +643,17 @@ def payment_complete(request):
     if data['matchingOrders'] != 0:
         for o in data['orders']:
             if o['localRefId'] == '2025 Reporting Form' and o['orderStatus'] == 'COMPLETE':
-                order.payment_status = PAYMENT_STATUS.success
-                order.save()
+                with transaction.atomic():
+                    order.payment_status = PAYMENT_STATUS.success
+                    order.save()
 
-                ids = []  # update our record with the properties that were paid for
-                for item in o['items']:
-                    for field in item['itemAttributes']:
-                        if field['fieldName'] == 'VIEWID':
-                            ids.append(int(field['fieldValue']))
-                order.properties.set(ids)
-                _mark_buildings_paid(order, order.organization.ordersettings)
+                    ids = []  # update our record with the properties that were paid for
+                    for item in o['items']:
+                        for field in item['itemAttributes']:
+                            if field['fieldName'] == 'VIEWID':
+                                ids.append(int(field['fieldValue']))
+                    order.properties.set(ids)
+                    _mark_buildings_paid(order, order.organization.ordersettings)
                 message = "Thank you for your payment!"  # todo add more to the message
     else:
         # todo if order was not completed correctly

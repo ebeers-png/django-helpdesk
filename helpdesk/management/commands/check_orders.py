@@ -2,6 +2,7 @@
 from datetime import datetime, timedelta
 
 from django.core.management.base import BaseCommand
+from django.db import transaction
 from django.utils.timezone import get_current_timezone
 
 from helpdesk.models import Order, OrderSettings, PAYMENT_STATUS
@@ -41,17 +42,18 @@ def process_orders():
                 else:
                     for o in data['orders']:
                         if o['localRefId'] == '2025 Reporting Form' and o['orderStatus'] == 'COMPLETE':
-                            order.payment_status = PAYMENT_STATUS.success
-                            order.save()
-                            logger.info(f"Marked order {order.id} as successful")
+                            with transaction.atomic():
+                                order.payment_status = PAYMENT_STATUS.success
+                                logger.info(f"Marked order {order.id} as successful")
 
-                            ids = []  # update our record with the properties that were paid for
-                            for item in o['items']:
-                                for field in item['itemAttributes']:
-                                    if field['fieldName'] == 'VIEWID':
-                                        ids.append(int(field['fieldValue']))
-                            order.properties.set(ids)
-                            _mark_buildings_paid(order, settings)
+                                ids = []  # update our record with the properties that were paid for
+                                for item in o['items']:
+                                    for field in item['itemAttributes']:
+                                        if field['fieldName'] == 'VIEWID':
+                                            ids.append(int(field['fieldValue']))
+                                order.properties.set(ids)
+                                _mark_buildings_paid(order, settings)
+                                order.save()
 
                         elif o['localRefId'] == '2025 Reporting Form' and o['orderStatus'] == 'OPEN':
                             logger.info(f"Left order {order.id} unchanged: still open")
